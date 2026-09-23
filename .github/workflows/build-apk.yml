@@ -35,8 +35,40 @@ jobs:
       - name: Grant Execute Permission to gradlew
         run: chmod +x gradlew
 
+      - name: Ensure Debug Keystore Exists
+        run: |
+          if [ -f "./debug.keystore.base64" ] && [ ! -f "./debug.keystore" ]; then
+            echo "Decoding debug.keystore from base64..."
+            base64 -d ./debug.keystore.base64 > ./debug.keystore
+          elif [ ! -f "./debug.keystore" ]; then
+            echo "Generating debug keystore..."
+            keytool -genkey -v \
+              -keystore ./debug.keystore \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -dname "CN=Android Debug,O=Android,C=US" \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000
+          fi
+          ls -la ./debug.keystore
+
+      - name: Clean Duplicate Webp Icons if present
+        run: |
+          rm -f app/src/main/res/mipmap-*/ic_launcher*.webp || true
+
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace
+        run: ./gradlew assembleDebug --stacktrace --no-daemon
+
+      - name: Verify Generated APK
+        run: |
+          APK_PATH=$(ls app/build/outputs/apk/debug/*.apk | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            echo "ERROR: APK not found!"
+            exit 1
+          fi
+          echo "Found APK at: $APK_PATH"
 
       - name: Upload APK to Artifacts
         uses: actions/upload-artifact@v4
@@ -45,15 +77,14 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 14
 
-      - name: Create GitHub Release with APK
+      - name: Create GitHub Release
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION_TAG="v1.0.${{ github.run_number }}"
           APK_PATH=$(ls app/build/outputs/apk/debug/*.apk | head -n 1)
-          echo "Found APK: $APK_PATH"
           gh release create "$VERSION_TAG" "$APK_PATH" \
             --title "JARVIS Android App ($VERSION_TAG)" \
             --notes "🚀 Automated build of JARVIS AI APK. Download the .apk file below to install on Android." \
-            || echo "Release note: gh release command finished."
+            || echo "Release note: gh release command finished or permissions restricted."
