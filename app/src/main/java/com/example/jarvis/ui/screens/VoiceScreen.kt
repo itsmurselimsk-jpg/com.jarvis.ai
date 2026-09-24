@@ -169,50 +169,102 @@ fun VoiceScreen(
             }
 
             // Central Area: Live Fluid Orb & Status Text
+            val isActuallySpeaking = isSpeaking || jarvisState == JarvisState.SPEAKING
+            val isActuallyThinking = jarvisState == JarvisState.THINKING
+            val isActuallyListening = isListening || jarvisState == JarvisState.LISTENING
+
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
                 modifier = Modifier.weight(1f)
             ) {
-                // Fluid Voice Orb
+                // Fluid Voice Orb with tap to interrupt
                 ChatGPTVoiceOrb(
                     size = 270.dp,
-                    isActive = isListening || isSpeaking,
-                    isSpeaking = isSpeaking,
-                    isListening = isListening,
+                    isActive = isActuallyListening || isActuallySpeaking || isActuallyThinking,
+                    isSpeaking = isActuallySpeaking,
+                    isListening = isActuallyListening,
                     audioRmsDb = voiceRmsDb,
-                    primaryColor = Color(0xFF3B82F6),
-                    secondaryColor = Color(0xFF93C5FD),
-                    cloudColor = Color(0xFFDBEAFE)
+                    primaryColor = when {
+                        isActuallySpeaking -> Color(0xFF2563EB)
+                        isActuallyThinking -> Color(0xFF8B5CF6)
+                        else -> Color(0xFF00B4D8)
+                    },
+                    secondaryColor = when {
+                        isActuallySpeaking -> Color(0xFF60A5FA)
+                        isActuallyThinking -> Color(0xFFA78BFA)
+                        else -> Color(0xFF90E0EF)
+                    },
+                    cloudColor = when {
+                        isActuallySpeaking -> Color(0xFFDBEAFE)
+                        isActuallyThinking -> Color(0xFFEDE9FE)
+                        else -> Color(0xFFCAF0F8)
+                    },
+                    modifier = Modifier.clickable {
+                        if (isActuallySpeaking) {
+                            onInterruptAndListen()
+                        } else if (!isActuallyListening && !isActuallyThinking) {
+                            onStartListening()
+                        }
+                    }
                 )
 
                 Spacer(modifier = Modifier.height(28.dp))
 
                 // Status message or live transcription
                 val statusText = when {
-                    isSpeaking -> "Speaking..."
-                    isListening && liveTranscript.isNotBlank() -> liveTranscript
-                    isListening -> "Listening..."
+                    isActuallySpeaking -> "Speaking..."
+                    isActuallyThinking -> "Thinking..."
+                    isActuallyListening && liveTranscript.isNotBlank() -> liveTranscript
+                    isActuallyListening -> "Listening..."
                     isMicMuted -> "Microphone muted"
-                    else -> "Tap to start conversation"
+                    else -> "Listening..."
                 }
 
                 Text(
                     text = statusText,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Medium,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
                     color = textPrimary,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(horizontal = 24.dp)
                 )
 
-                if (lastResponse.isNotBlank() && !isSpeaking) {
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Interruption badge when speaking
+                if (isActuallySpeaking) {
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(buttonBg)
+                            .clickable { onInterruptAndListen() }
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.GraphicEq,
+                            contentDescription = "Interrupt",
+                            tint = Color(0xFF2563EB),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = "Tap to interrupt",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = textSecondary
+                        )
+                    }
+                }
+
+                if (lastResponse.isNotBlank()) {
                     Text(
                         text = lastResponse,
                         fontSize = 13.sp,
                         color = textSecondary,
                         textAlign = TextAlign.Center,
-                        maxLines = 2,
+                        maxLines = 3,
                         modifier = Modifier.padding(horizontal = 32.dp, vertical = 6.dp)
                     )
                 }

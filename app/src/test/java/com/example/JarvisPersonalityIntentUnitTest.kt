@@ -139,4 +139,21 @@ class JarvisPersonalityIntentUnitTest {
         val haalResp = JarvisPersonality.generateConversationalResponse("Kya haal hai?", ConversationIntent.CASUAL_CONVERSATION, LanguageStyle.HINGLISH)
         assertTrue(haalResp.contains("mast") || haalResp.contains("tu bata"))
     }
+
+    @Test
+    fun testAutonomousBrainGreetingIsNaturalAndNotRobotic() {
+        val hiResponse = com.example.jarvis.provider.JarvisAutonomousBrain.generateAutonomousResponse("hi")
+        assertFalse(hiResponse.contains("quantum neural"))
+        assertFalse(hiResponse.contains("### 🛸"))
+        assertTrue(hiResponse.contains("bhai") || hiResponse.contains("Sir") || hiResponse.contains("chal raha"))
+
+        val helloResponse = com.example.jarvis.provider.JarvisAutonomousBrain.generateAutonomousResponse("hello")
+        assertFalse(helloResponse.contains("quantum neural"))
+        assertFalse(helloResponse.contains("### 🛸"))
+        assertTrue(helloResponse.contains("Sir") || helloResponse.contains("Hello"))
+
+        val kyaChalRaha = com.example.jarvis.provider.JarvisAutonomousBrain.generateAutonomousResponse("kya chal raha hai")
+        assertFalse(kyaChalRaha.contains("quantum neural"))
+        assertTrue(kyaChalRaha.contains("badhiya") || kyaChalRaha.contains("Sir"))
+    }
 }

@@ -70,6 +70,7 @@ class AgentBrain(
     private var lastExecutedToolResult: String? = null
 
     var onSpeechCompletedCallback: (() -> Unit)? = null
+    var isLiveVoiceSessionActive: Boolean = false
 
     val pluginManager = com.example.jarvis.plugin.PluginManager(bridge.getApplicationContext(), repository)
 
@@ -583,7 +584,8 @@ class AgentBrain(
     ) {
         _currentPlanExplanation.value = null
         val settings = repository.settings.value
-        if (settings.autoSpeakResponses) {
+        val shouldSpeak = isLiveVoiceSessionActive || settings.autoSpeakResponses
+        if (shouldSpeak) {
             onSpeaking()
             bridge.speak(
                 text = text,

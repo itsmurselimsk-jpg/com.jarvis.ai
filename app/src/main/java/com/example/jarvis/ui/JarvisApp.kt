@@ -115,6 +115,7 @@ fun JarvisApp(
     val speechSupported by viewModel.speechSupported.collectAsState()
     val safetyRequest by viewModel.safetyRequest.collectAsState()
     val isContinuousConversationActive by viewModel.isContinuousConversationActive.collectAsState()
+    val isLiveVoiceSessionActive by viewModel.isLiveVoiceSessionActive.collectAsState()
     val isMicMuted by viewModel.isMicMuted.collectAsState()
     val isSpeakerEnabled by viewModel.isSpeakerEnabled.collectAsState()
     val expenses by viewModel.expenses.collectAsState(initial = emptyList())
@@ -129,12 +130,12 @@ fun JarvisApp(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
 
-    // Request audio permission launcher
+    // Request audio permission launcher for Live Voice Conversation Session
     val audioPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
-            viewModel.startListening()
+            viewModel.startLiveVoiceSession()
         }
     }
 
@@ -269,7 +270,7 @@ fun JarvisApp(
                             },
                             onVoiceModeClick = {
                                 coroutineScope.launch { drawerState.close() }
-                                viewModel.setTab(NavTab.HOME)
+                                audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                             }
                         )
                     }
@@ -295,7 +296,36 @@ fun JarvisApp(
                             .padding(innerPadding)
                     ) {
                         val currentSubScreen = activeSubScreen
-                        if (currentSubScreen != null) {
+                        if (currentSubScreen == SubScreen.VOICE) {
+                            // Live Voice Conversation Session Full-Screen Experience
+                            com.example.jarvis.ui.screens.VoiceScreen(
+                                jarvisState = jarvisState,
+                                isListening = isListening,
+                                isSpeaking = isSpeaking,
+                                liveTranscript = liveTranscript,
+                                lastResponse = lastResponse,
+                                speechSupported = speechSupported,
+                                voiceRmsDb = voiceRmsDb,
+                                isContinuousModeActive = isLiveVoiceSessionActive,
+                                isMicMuted = isMicMuted,
+                                isSpeakerEnabled = isSpeakerEnabled,
+                                wakeWordStatus = "Live Session Active",
+                                currentLanguage = settings.languageCode,
+                                currentVoiceProfile = settings.voiceProfileName,
+                                isDarkTheme = isDarkTheme,
+                                onStartListening = { viewModel.startLiveListeningLoop() },
+                                onStopListening = { viewModel.stopListening() },
+                                onSpeakText = { text, rate, pitch -> viewModel.speakText(text, rate, pitch) },
+                                onStopSpeaking = { viewModel.stopSpeaking() },
+                                onToggleContinuousMode = { viewModel.toggleContinuousConversation() },
+                                onToggleMicMute = { viewModel.toggleMicMute() },
+                                onToggleSpeaker = { viewModel.toggleSpeaker() },
+                                onInterruptAndListen = { viewModel.interruptAndListen() },
+                                onNavigateVoiceSetup = { viewModel.openSubScreen(SubScreen.VOICE_SETUP) },
+                                onNavigateVoiceProfiles = { viewModel.openSubScreen(SubScreen.VOICE_SELECTION) },
+                                onCloseVoiceMode = { viewModel.endLiveVoiceSession() }
+                            )
+                        } else if (currentSubScreen != null) {
                             // SubScreen Container with Header
                             Column(modifier = Modifier.fillMaxSize()) {
                                 SubScreenHeader(
@@ -440,6 +470,7 @@ fun JarvisApp(
                                         repository = viewModel.repository,
                                         onBack = { viewModel.closeSubScreen() }
                                     )
+                                    SubScreen.VOICE -> {}
                                 }
                             }
                         } else {
@@ -464,8 +495,8 @@ fun JarvisApp(
                                         tiltY = deviceTilt.second,
                                         rmsDb = voiceRmsDb,
                                         onVoiceClick = {
-                                            if (isListening) {
-                                                viewModel.stopListening()
+                                            if (isLiveVoiceSessionActive) {
+                                                viewModel.endLiveVoiceSession()
                                             } else {
                                                 audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                                             }
@@ -509,8 +540,8 @@ fun JarvisApp(
                                             coroutineScope.launch { drawerState.open() }
                                         },
                                         onVoiceClick = {
-                                            if (isListening) {
-                                                viewModel.stopListening()
+                                            if (isLiveVoiceSessionActive) {
+                                                viewModel.endLiveVoiceSession()
                                             } else {
                                                 audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                                             }

@@ -68,27 +68,27 @@ object JarvisPersonality {
             ConversationIntent.GREETING -> {
                 when (languageStyle) {
                     LanguageStyle.HINGLISH -> when {
-                        lower == "hi" -> "Hello bhai, all systems operational, Sir. Kya instruction hai?"
-                        lower == "hello" -> "Hello Sir. Arc reactor humming smoothly, ready for directives."
-                        lower.contains("jarvis") -> "At your service, Sir. Listening."
-                        else -> "Good to see you, Sir. Telemetry looks clear, what are we building today?"
+                        lower == "hi" || lower == "hii" -> "Hi bhai 😄\nKya chal raha hai?"
+                        lower == "hello" -> "Hello Sir! Sab badhiya chal raha hai. Aap batao, aaj kya plan hai?"
+                        lower.contains("jarvis") -> "Hello Sir! Listening, batao kya karna hai?"
+                        else -> "Hello bhai, sab ready hai, Sir. Kya instruction hai?"
                     }
-                    LanguageStyle.BANGLISH, LanguageStyle.BENGALI -> "Nomoshkar Sir. JARVIS core fully ready. Ki directive ache?"
-                    LanguageStyle.HINDI -> "नमस्ते सर! जेएआरवीआईएस (JARVIS) प्रणाली तैयार है। आज क्या निर्देश हैं?"
-                    else -> "At your service, sir. All core diagnostics nominal. How may I assist?"
+                    LanguageStyle.BANGLISH, LanguageStyle.BENGALI -> "Hi dada! Kemon achhen? Ki chalchhe bolun?"
+                    LanguageStyle.HINDI -> "नमस्ते सर! सब बढ़िया चल रहा है। बताइए आज क्या करना है?"
+                    else -> "Hey Sir! How are things going? What can I help you with today?"
                 }
             }
 
             ConversationIntent.CASUAL_CONVERSATION -> {
                 when {
-                    lower.contains("kya haal hai") || lower.contains("how are you") -> when (languageStyle) {
-                        LanguageStyle.HINGLISH -> "Ekdum mast, Sir! Matrix operating at 99.8% efficiency. Coffee ki zaroorat sirf aapko padti hai, mujhe bas power. Tu batao, kya instruction hai?"
+                    lower.contains("kya haal hai") || lower.contains("how are you") || lower.contains("kaisa hai") || lower.contains("kaise ho") -> when (languageStyle) {
+                        LanguageStyle.HINGLISH -> "Ekdum mast, Sir! Sab badhiya chal raha hai. Tu batao, kya instruction hai?"
                         LanguageStyle.BANGLISH, LanguageStyle.BENGALI -> "Ami fully functional Sir. Apnar ki khobor?"
-                        LanguageStyle.HINDI -> "सभी प्रणालियाँ पूरी क्षमता पर काम कर रही हैं सर। आप बताइए, क्या चल रहा है?"
-                        else -> "All systems operating within optimal thresholds, sir. Quite composed, thank you."
+                        LanguageStyle.HINDI -> "सब बढ़िया है सर! आप बताइए, आप कैसे हैं?"
+                        else -> "All systems operating within optimal thresholds, sir. How are you doing today?"
                     }
                     lower.contains("kya kar raha hai") || lower.contains("what are you doing") -> when (languageStyle) {
-                        LanguageStyle.HINGLISH -> "Aapke device telemetry aur background tasks par nazar rakhe hue hoon, Sir. Kuch execute karna hai?"
+                        LanguageStyle.HINGLISH -> "Bas aapke agle instruction ka intezar kar raha hoon, Sir! Kuch execute karna hai?"
                         else -> "Monitoring system telemetry and awaiting your next directive, sir."
                     }
                     lower.contains("tell me a joke") || lower.contains("joke") -> when (languageStyle) {

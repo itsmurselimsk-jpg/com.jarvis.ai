@@ -95,6 +95,7 @@ class AndroidBridge(private val context: Context) {
     fun getApplicationContext(): Context = context
 
     private var onSpeechResultCallback: ((String) -> Unit)? = null
+    private var onSpeechErrorCallback: ((Int) -> Unit)? = null
     private var onUtteranceDoneCallback: ((String?) -> Unit)? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     private var torchCallback: CameraManager.TorchCallback? = null
@@ -162,6 +163,7 @@ class AndroidBridge(private val context: Context) {
                         override fun onError(error: Int) {
                             _isListening.value = false
                             _voiceRmsDb.value = 0f
+                            onSpeechErrorCallback?.invoke(error)
                         }
                         override fun onResults(results: Bundle?) {
                             _isListening.value = false
@@ -171,10 +173,13 @@ class AndroidBridge(private val context: Context) {
                             if (cleaned.isNotBlank()) {
                                 if (echoDetector.shouldRejectAsEcho(cleaned)) {
                                     Log.d("AndroidBridge", "Echo Shield: Ignored self-feedback echo: $cleaned")
+                                    onSpeechErrorCallback?.invoke(SpeechRecognizer.ERROR_NO_MATCH)
                                     return
                                 }
                                 _liveTranscript.value = cleaned
                                 onSpeechResultCallback?.invoke(cleaned)
+                            } else {
+                                onSpeechErrorCallback?.invoke(SpeechRecognizer.ERROR_NO_MATCH)
                             }
                         }
                         override fun onPartialResults(partialResults: Bundle?) {
@@ -246,13 +251,21 @@ class AndroidBridge(private val context: Context) {
     }
 
     fun interruptAndListen(onResult: (String) -> Unit) {
+        interruptAndListen(onResult, null)
+    }
+
+    fun interruptAndListen(onResult: (String) -> Unit, onError: ((Int) -> Unit)?) {
         if (_isSpeaking.value) {
             stopSpeaking()
         }
-        startListening(onResult)
+        startListening(onResult, onError)
     }
 
     fun startListening(onResult: (String) -> Unit) {
+        startListening(onResult, null)
+    }
+
+    fun startListening(onResult: (String) -> Unit, onError: ((Int) -> Unit)?) {
         if (_isMicMuted.value) {
             _isListening.value = false
             return
@@ -261,6 +274,7 @@ class AndroidBridge(private val context: Context) {
             stopSpeaking()
         }
         onSpeechResultCallback = onResult
+        onSpeechErrorCallback = onError
         _liveTranscript.value = ""
 
         mainHandler.post {

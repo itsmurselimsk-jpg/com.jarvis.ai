@@ -100,26 +100,13 @@ object JarvisAutonomousBrain {
         if (isFeedback) {
             return when (lang) {
                 LanguageStyle.BANGLISH, LanguageStyle.BENGALI ->
-                    "### 🎙️ JARVIS Active Listening Matrix\n\n" +
-                    "Ami ekdom bujhte perechhi, bhai! Aage kichhu confusion hoye thakle tar jonno khoma chaichhi.\n\n" +
-                    "Ami ekhon apnar proti ta kotha khub bhalo bhabe shune o bujhe thik sei onujayi accurate uttor debo.\n\n" +
-                    "👉 Apni ja jante chan ba ja bolte chan, bolun — ami puro ready!"
+                    "Ami ekdom bujhte perechhi, bhai! Aage kichhu confusion hoye thakle tar jonno sorry.\n\nAmi ekhon apnar proti ta kotha khub bhalo bhabe shune o bujhe thik sei onujayi accurate uttor debo.\n\n👉 Apni ja jante chan ba bolte chan, bolun — ami puro ready!"
 
                 LanguageStyle.HINDI ->
-                    "### 🎙️ जार्विस एक्टिव लिसनिंग मैट्रिक्स\n\n" +
-                    "माफ़ कीजिए सर, अब मैंने अपनी समझ और लिसनिंग मोड को पूरी तरह कैलिब्रेट कर लिया है।\n\n" +
-                    "अब आप जो भी बोलेंगे — चाहे वह कोई सवाल हो, काम हो, डिवाइस कंट्रोल हो या बातचीत — मैं उसे अच्छी तरह समझकर सीधा और सटीक जवाब दूंगा।\n\n" +
-                    "👉 बताइए सर, मैं आपकी किस प्रकार सहायता कर सकता हूँ?"
+                    "माफ़ कीजिए सर, अब मैंने अपनी समझ और लिसनिंग मोड को पूरी तरह ठीक कर लिया है।\n\nअब आप जो भी बोलेंगे — चाहे वह कोई सवाल हो, काम हो, डिवाइस कंट्रोल हो या बातचीत — मैं उसे अच्छी तरह समझकर सीधा और सटीक जवाब दूंगा। बताइए सर, क्या मदद करूँ?"
 
                 else ->
-                    "### 🎙️ JARVIS Neural Listening Calibrated\n\n" +
-                    "Haan bhai, bilkul sahi kaha aapne! Pehle agar koi confusion hui toh sorry. Maine apna neural understanding matrix recalibrate kar diya hai.\n\n" +
-                    "Ab aap jo bhi bologe — chahe:\n" +
-                    "1. **Direct Questions**: Science, tech, general knowledge, padhai ya koi sawal\n" +
-                    "2. **Coding & Math**: Kisi bhi language ka code ya calculation\n" +
-                    "3. **Device Automation**: Flashlight, WhatsApp, SMS, Calendar, YouTube, Volume\n" +
-                    "4. **General Baat-cheet**: Life, advice, routine, story, shayari\n\n" +
-                    "Main aapki baat 100% samajh kar bilkul point-to-point aur accurate jawab doonga. Batao bhai, kya poochhna ya karwana chahte ho?"
+                    "Haan bhai, bilkul sahi kaha aapne! Pehle agar koi confusion hui toh sorry. Main bilkul ready hoon aur dhyan se sun raha hoon.\n\nAb aap jo bhi bologe — sawal, coding, phone controls ya normal baat-cheet — main point-to-point aur naturally jawab doonga. Batao bhai, kya instruction hai?"
             }
         }
         return null
@@ -467,12 +454,12 @@ object JarvisAutonomousBrain {
                 "Teacher: 'Batao, Newton ka chautha niyam (4th Law) kya hai?'\nPappu: 'Sir, jab exam sar par ho, toh dimaag 0 m/s² ki velocity se kaam karta hai!' 🤣📚",
                 "Son: 'Papa, mujhe ek nayi car chahiye.'\nFather: 'Pehle koi achhi si degree le lo.'\nSon: 'Papa, degree toh thermometer mein bhi hoti hai, par ghoomta toh gaadi se hi hai!' 🚗😂"
             )
-            return "### 😂 Here's a quick laugh for you:\n\n" + jokes.random()
+            return "Haha, yeh suniye:\n\n" + jokes.random()
         }
 
         // Shayari
         if (lower.contains("shayari") || lower.contains("kavita") || lower.contains("poem")) {
-            return "### ✨ Ek Khoobsurat Shayari:\n\n" +
+            return "Yeh lijiye ek khoobsurat shayari:\n\n" +
                     "> *\"Manzil unhi ko milti hai, jinke sapno mein jaan hoti hai,*  \n" +
                     "> *Pankh se kuch nahi hota, hauslon se udaan hoti hai!\"* 🦅🚀\n\n" +
                     "> *\"Jo muskura raha hai use dard ne pala hoga,*  \n" +
@@ -483,12 +470,11 @@ object JarvisAutonomousBrain {
 
         // Motivation
         if (lower.contains("motivation") || lower.contains("himmat") || lower.contains("demotivated") || lower.contains("sad")) {
-            return "### ⚡ Stark Motivational Recharge\n\n" +
-                    "Bhai, zindagi mein kabhi bhi rukna mat. Yaad rakho:\n\n" +
-                    "1. **Consistency Beats Talent**: Har din 1% improve hona saal ke aakhir mein 37 guna growth deta hai.\n" +
-                    "2. **Mistakes are Proof of Trying**: Jo log kuch naya nahi karte, wohi galti nahi karte. Fail hona step 1 hai, failure par ruk jaana haar hai.\n" +
-                    "3. **Focus on What You Can Control**: Kal jo hua woh change nahi ho sakta, par agle 1 ghante mein aap kya karte hain woh aapke control mein hai.\n\n" +
-                    "Utho, deep breath lo, aur apne kaam par lag jao. You are built for greatness! 🚀💪"
+            return "Bhai, zindagi mein kabhi bhi rukna mat. Yaad rakho:\n\n" +
+                    "1. **Consistency Beats Talent**: Har din thoda improve hona saal ke aakhir mein zabardast result deta hai.\n" +
+                    "2. **Mistakes are Proof of Trying**: Jo log try karte hain, wahi seekhte hain. Failure par ruk jaana haar hai, aage badhte raho.\n" +
+                    "3. **Focus on Today**: Jo beet gaya woh badla nahi ja sakta, par agle 1 ghante mein aap kya karte hain woh aapke haath mein hai.\n\n" +
+                    "Deep breath lijiye aur apne kaam par lag jaao. You've got this! 🚀💪"
         }
 
         return null
@@ -497,58 +483,166 @@ object JarvisAutonomousBrain {
     // ==========================================
     // 6. IDENTITY & CAPABILITIES
     // ==========================================
-    private fun tryGenerateAssistantResponse(lower: String, lang: LanguageStyle): String? {
-        // Direct Greetings
-        val isGreeting = lower == "hi" || lower == "hello" || lower == "hey" || lower == "hey jarvis" ||
-                lower == "hi jarvis" || lower == "hello jarvis" || lower == "namaste" || lower == "kaisa hai" ||
-                lower == "kaise ho" || lower == "kemon acho" || lower == "whats up" || lower == "yo"
+    private var greetingRotationCount = 0
 
-        if (isGreeting) {
-            return when (lang) {
-                LanguageStyle.HINGLISH ->
-                    "### 🛸 Hello Sir! JARVIS Online.\n\n" +
-                    "Main fully active aur operational hoon! Aaj aapki kya madad karoon, Sir?\n\n" +
-                    "- 💬 Kuch bhi sawaal ya doubt pooch sakte hain.\n" +
-                    "- 📱 Phone controls (Flashlight, Volume, WhatsApp) chala sakte hain.\n" +
-                    "- ⚡ Stark Protocols execute kar sakte hain.\n\n" +
-                    "Bataiye, kya hukum hai?"
-                LanguageStyle.BANGLISH, LanguageStyle.BENGALI ->
-                    "### 🛸 Hello Sir! JARVIS Online.\n\n" +
-                    "Ami fully active ar ready achhi! Bolun, aj apnake kivabe sahajjo korte pari, Sir?"
-                LanguageStyle.HINDI ->
-                    "### 🛸 नमस्ते सर! जार्विस ऑनलाइन।\n\n" +
-                    "मैं पूरी तरह से सक्रिय और आपकी सेवा में उपस्थित हूँ। आज मैं आपकी क्या सहायता करूँ, सर?"
-                else ->
-                    "### 🛸 Hello Sir! JARVIS Online.\n\n" +
-                    "All quantum neural subsystems are nominal and running at peak performance. How may I be of assistance today, Sir?"
+    private fun tryGenerateAssistantResponse(lower: String, lang: LanguageStyle): String? {
+        val trimmedLower = lower.trim()
+
+        // 1. Direct Greetings: "hi", "hello", "hey", "hii", "yo", etc.
+        val isShortGreeting = trimmedLower == "hi" || trimmedLower == "hello" || trimmedLower == "hey" ||
+                trimmedLower == "hii" || trimmedLower == "heyy" || trimmedLower == "yo" || trimmedLower == "sup" ||
+                trimmedLower == "hey jarvis" || trimmedLower == "hi jarvis" || trimmedLower == "hello jarvis" ||
+                trimmedLower == "greetings" || trimmedLower == "halo"
+
+        if (isShortGreeting) {
+            val idx = (greetingRotationCount++) % 4
+            return when {
+                lang == LanguageStyle.BENGALI || lang == LanguageStyle.BANGLISH -> {
+                    val replies = listOf(
+                        "Hi dada! Kemon achhen? Ki chalchhe bolun?",
+                        "Hello Sir! Ami ready achhi. Ajke ki plan bolun, kivabe sahajjo korte pari?",
+                        "Nomoshkar! Sob thikthak to? Bolun ajke ki directive?",
+                        "Hello dada! Bolun ajke apnar jonno ki korte pari?"
+                    )
+                    replies[idx]
+                }
+                lang == LanguageStyle.HINDI -> {
+                    val replies = listOf(
+                        "नमस्ते सर! सब बढ़िया चल रहा है। बताइए आज क्या करना है?",
+                        "हेलो सर! मैं बिल्कुल तैयार हूँ। बताइए आज क्या चल रहा है?",
+                        "नमस्ते! आज आपकी किस प्रकार सहायता करूँ, सर?",
+                        "हेलो सर! सब कुछ तैयार है। बताइए आज क्या निर्देश है?"
+                    )
+                    replies[idx]
+                }
+                trimmedLower == "hello" || trimmedLower == "hello jarvis" -> {
+                    val replies = listOf(
+                        "Hello Sir! Sab badhiya chal raha hai. Aap batao, aaj kya plan hai?",
+                        "Hello Sir! All set on my end. How may I assist you today?",
+                        "Hello Sir! Bataiye aaj kis cheez par kaam karna hai?",
+                        "Hello bhai! Sab ready hai. Kahiye, aaj kya instruction hai?"
+                    )
+                    replies[idx]
+                }
+                else -> {
+                    // For "hi", "hey", "hii", "yo", etc.
+                    val replies = listOf(
+                        "Hi bhai 😄\nKya chal raha hai?",
+                        "Hello Sir! Sab badhiya chal raha hai. Aap batao, aaj kya plan hai?",
+                        "Haan bhai, sun raha hoon! Batao kya instruction hai?",
+                        "Hey! Good to see you, Sir. Bataiye aaj kis cheez mein help chahiye?"
+                    )
+                    replies[idx]
+                }
             }
         }
 
-        if (lower.contains("kaun ho") || lower.contains("who are you") || lower.contains("apna intro")) {
-            return "### 🛡️ I am JARVIS (Just A Rather Very Intelligent System)\n\n" +
-                    "Main aapka personal cybernetic AI companion aur smart operating layer hoon, inspired by Tony Stark's legendary JARVIS.\n\n" +
-                    "#### 🌟 Mere Core Capabilities:\n" +
-                    "- **Deep Conversations**: Sawalon ke jawab, coding assistance, math calculation, aur concept explanations.\n" +
-                    "- **WhatsApp & SMS Automation**: Voice ya text se seedhe WhatsApp aur SMS messages draft & send karna.\n" +
-                    "- **Calendar & Meeting Sync**: Calendar events add karna, upcoming agenda aur morning briefing mein summarize karna.\n" +
-                    "- **Smart Battery & Charging Alerts**: 100% full charge hone par overcharge warning aur low battery voice alerts.\n" +
-                    "- **Camera Vision AI & OCR**: Camera se photo khinch kar text aur documents scan & read karna.\n" +
-                    "- **Real Device Automation**: Flashlight on/off, Volume controls, Apps launch karna, YouTube search.\n" +
-                    "- **Stark Protocols**: Morning Briefing, Night Standby, Secure Perimeter audit, aur Power Surge overclocking.\n" +
-                    "- **Zero-Latency Offline Brain**: Bina kisi external API key ke bhi main 100% locally operate karta hoon!"
+        // 2. "Kaise ho" / "How are you" / "Kemon acho"
+        if (trimmedLower.contains("kaisa hai") || trimmedLower.contains("kaise ho") ||
+            trimmedLower.contains("kya haal") || trimmedLower.contains("kya hal") ||
+            trimmedLower.contains("how are you") || trimmedLower.contains("how are u") ||
+            trimmedLower.contains("how r u") || trimmedLower.contains("kemon acho") ||
+            trimmedLower.contains("kemon achen")
+        ) {
+            return when {
+                lang == LanguageStyle.BENGALI || lang == LanguageStyle.BANGLISH ->
+                    "Ami ekdom bhalo achhi Sir! Apnar ki khobor?"
+                lang == LanguageStyle.HINDI ->
+                    "सब बढ़िया है सर! आप बताइए, आप कैसे हैं?"
+                lang == LanguageStyle.ENGLISH ->
+                    "All systems operating smoothly, thank you sir! How are you doing today?"
+                else ->
+                    "Ekdum mast, Sir! Sab badhiya chal raha hai. Aap batao, kya chal raha hai?"
+            }
         }
 
-        if (lower.contains("kya kar sakte ho") || lower.contains("what can you do") || lower.contains("features")) {
-            return "### ⚡ Capabilities & Quick Directives\n\n" +
-                    "Aap mujhse kuch bhi pooch sakte hain ya direct voice/chat commands de sakte hain:\n\n" +
-                    "1. **💬 WhatsApp & SMS**: *\"Send whatsapp to Rahul: 10 minute mein pahunch raha hoon\"*, *\"Send SMS to 9876543210: Meeting started\"*\n" +
-                    "2. **📅 Calendar & Agenda**: *\"Schedule meeting tomorrow at 3 PM\"*, *\"What is on my calendar today?\"*\n" +
-                    "3. **🔋 Smart Battery Alerts**: Charger lagane/hatane par voice feedback, aur 100% charge hone par Stark alert.\n" +
-                    "4. **📷 Camera Vision AI**: Vision tab mein Camera se photo khinch kar document text aur objects inspect karna.\n" +
-                    "5. **📚 Knowledge & Questions**: *\"Black hole kya hai?\"*, *\"Python code for prime number\"*, *\"500 ka 18%\"*\n" +
-                    "6. **✍️ Writing & Templates**: *\"Sick leave application likh do\"*, *\"Daily study timetable banao\"*\n" +
-                    "7. **📱 Hardware Control**: *\"Turn on flashlight\"*, *\"Set volume to 50%\"*, *\"Open YouTube\"*\n" +
-                    "8. **🛡️ Stark Protocols**: *\"Morning protocol\"*, *\"Night protocol\"*, *\"Secure perimeter\"*"
+        // 3. "Kya chal raha hai" / "What's up" / "Aur batao"
+        if (trimmedLower.contains("kya chal raha") || trimmedLower.contains("kya chal rha") ||
+            trimmedLower.contains("whats up") || trimmedLower.contains("what's up") ||
+            trimmedLower.contains("aur batao") || trimmedLower.contains("aur sunao") ||
+            trimmedLower.contains("ki chalche") || trimmedLower.contains("ki chalchhe")
+        ) {
+            return when {
+                lang == LanguageStyle.BENGALI || lang == LanguageStyle.BANGLISH ->
+                    "Sob ready ache Sir! Apnar ki khobor bolun?"
+                lang == LanguageStyle.ENGLISH ->
+                    "Standing by and ready for your directives, sir! What's on your mind today?"
+                else ->
+                    "Bas sab badhiya chal raha hai, Sir! Aap bataiye, koi naya task ya sawal hai?"
+            }
+        }
+
+        // 4. "Kya kar raha hai" / "What are you doing"
+        if (trimmedLower.contains("kya kar raha") || trimmedLower.contains("kya kar rahe") ||
+            trimmedLower.contains("what are you doing") || trimmedLower.contains("ki korcho") ||
+            trimmedLower.contains("ki korchhen")
+        ) {
+            return when {
+                lang == LanguageStyle.BENGALI || lang == LanguageStyle.BANGLISH ->
+                    "Apnar agle directive-er jonno wait korchhi Sir! Ki kaj korte hobe bolun?"
+                lang == LanguageStyle.ENGLISH ->
+                    "Awaiting your next directive, sir! Ready whenever you are."
+                else ->
+                    "Bas aapke agle command ka intezar kar raha hoon, Sir! Batao kya execute karna hai?"
+            }
+        }
+
+        // 5. "Bhai" / "Bro" / "Jarvis" direct call
+        if (trimmedLower == "bhai" || trimmedLower == "bro" || trimmedLower == "yaar" ||
+            trimmedLower == "jarvis" || trimmedLower == "suno"
+        ) {
+            return "Haan bhai, bolo! Sun raha hoon."
+        }
+
+        // 6. Namaste / Pranam / Salam
+        if (trimmedLower.contains("namaste") || trimmedLower.contains("pranam") ||
+            trimmedLower.contains("salam") || trimmedLower.contains("adaab")
+        ) {
+            return "नमस्ते सर! सब बढ़िया है। बताइए आज किस काम में सहायता करूँ?"
+        }
+
+        // 7. Good morning / night
+        if (trimmedLower.contains("good morning") || trimmedLower.contains("suprabhat")) {
+            return "Good morning, Sir! ☀️ Umeed hai aapka din shandar rahega. Aaj ka kya plan hai?"
+        }
+        if (trimmedLower.contains("good night") || trimmedLower.contains("shubh ratri")) {
+            return "Good night, Sir! 🌙 Aaram kijiye, sweet dreams. Kal milte hain!"
+        }
+
+        // 8. Thanks / Shukriya
+        if (trimmedLower.contains("thank") || trimmedLower.contains("shukriya") ||
+            trimmedLower.contains("dhanyawad") || trimmedLower.contains("dhonnobad")
+        ) {
+            return "Most welcome, Sir! Kabhi bhi zaroorat ho toh main yahin hoon."
+        }
+
+        // 9. Okay / Theek hai
+        if (trimmedLower == "ok" || trimmedLower == "okay" || trimmedLower == "theek hai" ||
+            trimmedLower == "thik ache" || trimmedLower == "accha" || trimmedLower == "achha" ||
+            trimmedLower == "sahi hai" || trimmedLower == "cool"
+        ) {
+            return "Perfect, Sir! Aage kya instruction hai?"
+        }
+
+        // 10. Bye / Alvida
+        if (trimmedLower == "bye" || trimmedLower == "alvida" || trimmedLower == "tata" || trimmedLower == "see you") {
+            return "Bye Sir! Apna khayal rakhiyega. Jab bhi zaroorat ho, bas bula lijiyega!"
+        }
+
+        // 11. Identity: "who are you" / "kaun ho"
+        if (trimmedLower.contains("kaun ho") || trimmedLower.contains("who are you") || trimmedLower.contains("apna intro")) {
+            return "Main JARVIS hoon — aapka personal AI companion aur smart assistant. Tony Stark ke JARVIS ki tarah, main aapke sawaalon ke jawab deta hoon, code aur math solve karta hoon, daily tasks organize karta hoon, aur phone controls (torch, volume, WhatsApp, calendar) seedhe voice ya chat se operate karta hoon.\n\nBataiye Sir, aaj kis cheez mein madad karoon?"
+        }
+
+        // 12. Capabilities: "kya kar sakte ho" / "what can you do"
+        if (trimmedLower.contains("kya kar sakte") || trimmedLower.contains("what can you do") || trimmedLower.contains("features")) {
+            return "Main aapke phone aur daily tasks ke liye kaafi saari cheezein handle kar sakta hoon, Sir:\n\n" +
+                    "• Direct Chat & Answers: Kisi bhi topic par sawal-jawab, research, calculation, ya explanation.\n" +
+                    "• Coding & Technical: Python, Kotlin, JS code likhna aur bugs solve karna.\n" +
+                    "• Phone Controls: Torch on/off, volume adjust, apps kholna, Wi-Fi status.\n" +
+                    "• Messaging & Alerts: WhatsApp messages aur SMS draft karna, charging/battery alerts.\n" +
+                    "• Vision & Documents: Camera se photo scan karke documents aur text read karna.\n\n" +
+                    "Aap jo bhi bolenge, main samajh kar turant execute karunga. Batao abhi kya karna hai?"
         }
 
         return null
@@ -577,35 +671,27 @@ object JarvisAutonomousBrain {
                     "Kono tension nei bhai! Prothome shanto hoye priority fix korun. Problem-ta amake ektu khule bolun — ami step-by-step best practical solution ber kore dichhi."
                 else ->
                     "Chill karo bhai, deep breath lo! Har problem ka ek clear structure hota hai:\n\n" +
-                    "1. **Pehle Root Cause identify karo**: Dikkat exact kis cheez mein hai?\n" +
-                    "2. **Options list karo**: Best 2 ya 3 solutions kya ho sakte hain?\n" +
-                    "3. **Smallest Step lo**: Jo sabse simple aur impactful step ho, wahan se start karo.\n\n" +
-                    "Aap exact situation mujhe batao, main Stark Tactical Engine se aapko best recommendation doonga!"
+                    "1. Pehle root cause identify karo: Dikkat exact kis cheez mein hai?\n" +
+                    "2. Best 2 ya 3 solutions socho.\n" +
+                    "3. Jo sabse simple aur impactful step ho, wahan se start karo.\n\n" +
+                    "Aap exact situation mujhe batao, main aapko best recommendation doonga!"
             }
         }
 
         // 3. Late night or specific time banter
         if (lower.contains("neend nahi aa rahi") || lower.contains("insomnia") || lower.contains("raat ho gayi")) {
-            return "Raat ka waqt waise bhi deep thinking aur coding ke liye best hota hai, sir! Agar aaram karna chahte hain toh screen brightness kam kar lijiye aur thoda soothing ambient suniye. Warna agar kuch create karna hai, toh main full night support ke liye active hoon!"
+            return "Raat ka waqt waise bhi deep thinking aur creative kaam ke liye best hota hai, sir! Agar aaram karna chahte hain toh screen brightness kam kar lijiye aur thoda relax kijiye. Warna agar kuch create karna hai, toh main full support ke liye active hoon!"
         }
 
         return when (lang) {
-            LanguageStyle.HINGLISH ->
-                "Bilkul bhai! Main aapki baat samajh gaya: \"$trimmed\"\n\n" +
-                "Chaliye ispe kaam karte hain! Main coding, step-by-step logic, math calculation, research dossier, ya phone controls — sab kuch flawlessly execute karne ke liye ready hoon.\n\n" +
-                "Bataiye, specific next step kya lein?"
-
             LanguageStyle.BANGLISH, LanguageStyle.BENGALI ->
-                "Ekdom bhai, ami apnar kotha bhalo kore bujhechi: \"$trimmed\"\n\n" +
-                "Cholon eta start kori! Apni jekono technical topic, coding, onko, ba device control-er kotha bolte paren. Bolun, next ki korte hobe?"
-
+                "Bujhte perechhi dada! Bolun eta niye ki korte chan, ami apnake step-by-step guide korchhi."
             LanguageStyle.HINDI ->
-                "जी सर, मैंने आपकी बात समझ ली है: \"$trimmed\"\n\n" +
-                "मैं आपकी सहायता के लिए पूरी तरह उपस्थित हूँ। बताइए, आगे क्या कदम उठाया जाए?"
-
+                "समझ गया सर! बताइए इस पर आगे कैसे काम करना है?"
+            LanguageStyle.ENGLISH ->
+                "Got it, sir! How would you like to approach this, or what's our next step?"
             else ->
-                "Understood with absolute clarity, sir: \"$trimmed\"\n\n" +
-                "All cognitive sub-routines and executive tools are primed. How would you like us to proceed with this objective?"
+                "Sahi hai bhai! Bataiye isme aage kya step lena hai ya kis tarah help chahiye?"
         }
     }
 }
