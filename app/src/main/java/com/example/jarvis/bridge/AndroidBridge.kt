@@ -100,6 +100,8 @@ class AndroidBridge(private val context: Context) {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var torchCallback: CameraManager.TorchCallback? = null
     val echoDetector = com.example.jarvis.voice.EchoDetectionEngine()
+    private var bargeInDetector: com.example.jarvis.voice.AcousticBargeInDetector? = null
+    var onBargeInTriggered: (() -> Unit)? = null
 
     init {
         com.example.jarvis.memory.KnowledgeGraphEngine.initialize(context)
@@ -132,11 +134,14 @@ class AndroidBridge(private val context: Context) {
                     override fun onDone(utteranceId: String?) {
                         _isSpeaking.value = false
                         echoDetector.notifyTtsFinished()
+                        bargeInDetector?.stopMonitoring()
                         onUtteranceDoneCallback?.invoke(utteranceId)
                     }
                     override fun onError(utteranceId: String?) {
                         _isSpeaking.value = false
                         echoDetector.notifyTtsFinished()
+                        bargeInDetector?.stopMonitoring()
+                        onUtteranceDoneCallback?.invoke(utteranceId)
                     }
                 })
             }
@@ -163,6 +168,11 @@ class AndroidBridge(private val context: Context) {
                         override fun onError(error: Int) {
                             _isListening.value = false
                             _voiceRmsDb.value = 0f
+                            if (error == SpeechRecognizer.ERROR_CLIENT || error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) {
+                                try {
+                                    speechRecognizer?.cancel()
+                                } catch (_: Exception) {}
+                            }
                             onSpeechErrorCallback?.invoke(error)
                         }
                         override fun onResults(results: Bundle?) {
@@ -273,12 +283,17 @@ class AndroidBridge(private val context: Context) {
         if (_isSpeaking.value) {
             stopSpeaking()
         }
+        bargeInDetector?.stopMonitoring()
         onSpeechResultCallback = onResult
         onSpeechErrorCallback = onError
         _liveTranscript.value = ""
 
         mainHandler.post {
             try {
+                try {
+                    speechRecognizer?.cancel()
+                } catch (_: Exception) {}
+
                 if (speechRecognizer == null && SpeechRecognizer.isRecognitionAvailable(context)) {
                     initSpeechRecognizer()
                 }
@@ -294,6 +309,7 @@ class AndroidBridge(private val context: Context) {
             } catch (e: Exception) {
                 Log.w("AndroidBridge", "startListening failed: ${e.message}")
                 _isListening.value = false
+                onError?.invoke(SpeechRecognizer.ERROR_CLIENT)
             }
         }
     }
@@ -305,6 +321,7 @@ class AndroidBridge(private val context: Context) {
                 speechRecognizer?.cancel()
             } catch (_: Exception) {}
             _isListening.value = false
+            _voiceRmsDb.value = 0f
         }
     }
 
@@ -419,18 +436,31 @@ class AndroidBridge(private val context: Context) {
                 previousDone?.invoke(id)
                 if (id == utteranceId) {
                     abandonAudioFocus()
+                    bargeInDetector?.stopMonitoring()
                     onDone()
                 }
             }
         }
         _isSpeaking.value = true
         echoDetector.notifyTtsStarted(sanitizedText)
+
+        // Real-time acoustic barge-in detector: monitors microphone for user interruption during TTS
+        if (bargeInDetector == null) {
+            bargeInDetector = com.example.jarvis.voice.AcousticBargeInDetector(context) {
+                Log.i("AndroidBridge", "Acoustic barge-in detected, stopping TTS immediately")
+                stopSpeaking()
+                onBargeInTriggered?.invoke()
+            }
+        }
+        bargeInDetector?.startMonitoring()
+
         val params = Bundle()
         params.putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId)
         val result = textToSpeech?.speak(sanitizedText, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
         if (result != TextToSpeech.SUCCESS) {
             _isSpeaking.value = false
             echoDetector.notifyTtsFinished()
+            bargeInDetector?.stopMonitoring()
             abandonAudioFocus()
             onDone?.invoke()
         }
@@ -484,6 +514,7 @@ class AndroidBridge(private val context: Context) {
     }
 
     fun stopSpeaking() {
+        bargeInDetector?.stopMonitoring()
         com.example.jarvis.voice.HumanVoiceEngine.stop(this)
         stopDeviceTts()
     }

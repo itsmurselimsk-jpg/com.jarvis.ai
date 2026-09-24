@@ -210,12 +210,14 @@ fun JarvisApp(
         }
 
         is AuthState.Authenticated -> {
-            // Handle back button if drawer is open or in a SubScreen
-            BackHandler(enabled = drawerState.isOpen || activeSubScreen != null) {
+            // Handle back button if drawer is open, in a SubScreen, or not on HOME tab
+            BackHandler(enabled = drawerState.isOpen || activeSubScreen != null || currentTab != NavTab.HOME) {
                 if (drawerState.isOpen) {
                     coroutineScope.launch { drawerState.close() }
                 } else if (activeSubScreen != null) {
                     viewModel.closeSubScreen()
+                } else if (currentTab != NavTab.HOME) {
+                    viewModel.setTab(NavTab.HOME)
                 }
             }
 
@@ -536,6 +538,7 @@ fun JarvisApp(
                                         onSpeakMessage = { viewModel.speakText(it) },
                                         onRetryMessage = { viewModel.retryLastMessage() },
                                         onClearChat = { viewModel.repository.clearMessages() },
+                                        onBack = { viewModel.setTab(NavTab.HOME) },
                                         onOpenDrawer = {
                                             coroutineScope.launch { drawerState.open() }
                                         },

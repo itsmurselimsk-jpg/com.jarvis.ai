@@ -152,16 +152,22 @@ class JarvisViewModel(application: Application) : AndroidViewModel(application) 
     val activeFileAnalysis: StateFlow<com.example.jarvis.document.FileAnalysisResult?> = _activeFileAnalysis.asStateFlow()
 
     init {
-        // Continuous speech-to-speech loop: return to listening upon speech completion
-        brain.onSpeechCompletedCallback = {
+        // Real-time acoustic barge-in: when user speaks while JARVIS is speaking, immediately listen to user
+        bridge.onBargeInTriggered = {
             if (_isLiveVoiceSessionActive.value && !bridge.isMicMuted.value) {
                 viewModelScope.launch {
-                    delay(350)
+                    _jarvisState.value = JarvisState.LISTENING
+                    delay(150)
                     if (_isLiveVoiceSessionActive.value && !bridge.isMicMuted.value) {
                         startLiveListeningLoop()
                     }
                 }
-            } else if (_isContinuousConversationActive.value && !bridge.isMicMuted.value) {
+            }
+        }
+
+        // Speech completion callback for standard non-live continuous conversation mode
+        brain.onSpeechCompletedCallback = {
+            if (!_isLiveVoiceSessionActive.value && _isContinuousConversationActive.value && !bridge.isMicMuted.value) {
                 viewModelScope.launch {
                     delay(400)
                     startListening()
@@ -248,8 +254,12 @@ class JarvisViewModel(application: Application) : AndroidViewModel(application) 
                 } else {
                     if (_isLiveVoiceSessionActive.value && !bridge.isMicMuted.value) {
                         viewModelScope.launch {
-                            delay(300)
-                            if (_isLiveVoiceSessionActive.value && _jarvisState.value == JarvisState.LISTENING) {
+                            delay(200)
+                            if (_isLiveVoiceSessionActive.value &&
+                                !bridge.isMicMuted.value &&
+                                _jarvisState.value != JarvisState.THINKING &&
+                                _jarvisState.value != JarvisState.SPEAKING
+                            ) {
                                 startLiveListeningLoop()
                             }
                         }
@@ -257,14 +267,16 @@ class JarvisViewModel(application: Application) : AndroidViewModel(application) 
                 }
             },
             onError = { _ ->
+                // Keep listening continuously: do not turn off mic on silence timeout or no-match
                 if (_isLiveVoiceSessionActive.value &&
                     !bridge.isMicMuted.value &&
                     _jarvisState.value != JarvisState.THINKING &&
                     _jarvisState.value != JarvisState.SPEAKING
                 ) {
                     viewModelScope.launch {
-                        delay(400)
+                        delay(250)
                         if (_isLiveVoiceSessionActive.value &&
+                            !bridge.isMicMuted.value &&
                             _jarvisState.value != JarvisState.THINKING &&
                             _jarvisState.value != JarvisState.SPEAKING
                         ) {
@@ -296,15 +308,18 @@ class JarvisViewModel(application: Application) : AndroidViewModel(application) 
                 _lastResponse.value = lastJarvis
             },
             onIdle = {
-                if (_isLiveVoiceSessionActive.value && !bridge.isSpeaking.value) {
+                // When speech concludes, automatically and immediately return to LISTENING mode
+                if (_isLiveVoiceSessionActive.value) {
                     _jarvisState.value = JarvisState.LISTENING
-                    viewModelScope.launch {
-                        delay(300)
-                        if (_isLiveVoiceSessionActive.value) {
-                            startLiveListeningLoop()
+                    if (!bridge.isMicMuted.value) {
+                        viewModelScope.launch {
+                            delay(200)
+                            if (_isLiveVoiceSessionActive.value && !bridge.isMicMuted.value) {
+                                startLiveListeningLoop()
+                            }
                         }
                     }
-                } else if (!_isLiveVoiceSessionActive.value) {
+                } else {
                     _jarvisState.value = JarvisState.IDLE
                 }
             }
@@ -325,7 +340,12 @@ class JarvisViewModel(application: Application) : AndroidViewModel(application) 
         bridge.stopSpeaking()
         _jarvisState.value = JarvisState.LISTENING
         if (_isLiveVoiceSessionActive.value) {
-            startLiveListeningLoop()
+            viewModelScope.launch {
+                delay(150)
+                if (_isLiveVoiceSessionActive.value && !bridge.isMicMuted.value) {
+                    startLiveListeningLoop()
+                }
+            }
         } else {
             bridge.interruptAndListen { spokenText ->
                 _jarvisState.value = JarvisState.IDLE

@@ -29,6 +29,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Add
@@ -92,6 +93,7 @@ fun ChatScreen(
     onSpeakMessage: (String) -> Unit,
     onRetryMessage: () -> Unit,
     onClearChat: () -> Unit,
+    onBack: () -> Unit = {},
     onOpenDrawer: () -> Unit = {},
     onVoiceClick: () -> Unit = {},
     onVisionClick: () -> Unit = {},
@@ -116,38 +118,60 @@ fun ChatScreen(
             .fillMaxSize()
             .background(JarvisBackground)
             .imePadding()
+            .testTag("chat_screen")
             .testTag("conversation_screen")
     ) {
         // Holographic Top Header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .padding(horizontal = 14.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Box(
-                        modifier = Modifier
-                            .size(7.dp)
-                            .clip(CircleShape)
-                            .background(if (jarvisState == JarvisState.THINKING) JarvisAmber else JarvisCyanBright)
-                    )
-                    Text(
-                        text = "CONVERSATION // NEURAL LINK",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 1.2.sp,
-                        color = JarvisCyanBright
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(Color(0x2200E5FF))
+                        .testTag("chat_back_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back to Home",
+                        tint = JarvisCyanBright,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
-                Text(
-                    text = "Multilingual • English, Hindi, Hinglish Context",
-                    fontSize = 10.sp,
-                    color = JarvisTextSecondary
-                )
+
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .clip(CircleShape)
+                                .background(if (jarvisState == JarvisState.THINKING) JarvisAmber else JarvisCyanBright)
+                        )
+                        Text(
+                            text = "CONVERSATION // NEURAL LINK",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 1.2.sp,
+                            color = JarvisCyanBright
+                        )
+                    }
+                    Text(
+                        text = "Multilingual • English, Hindi, Hinglish Context",
+                        fontSize = 10.sp,
+                        color = JarvisTextSecondary
+                    )
+                }
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {

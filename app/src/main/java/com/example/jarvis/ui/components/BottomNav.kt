@@ -57,6 +57,10 @@ enum class NavTab(val label: String, val icon: ImageVector) {
     DEVICES("DEVICES", Icons.Default.Smartphone),
     SKILLS("SKILLS", Icons.Default.AutoAwesome),
     SETTINGS("SETTINGS", Icons.Default.Settings);
+
+    companion object {
+        val CHAT: NavTab get() = CONVERSATION
+    }
 }
 
 @Composable
@@ -135,6 +139,8 @@ fun BottomNav(
                         label = "dock_text_tint"
                     )
 
+                    val isChatTab = tab == NavTab.CONVERSATION
+
                     // Touch target with minimum 48dp height and width
                     Box(
                         modifier = Modifier
@@ -155,18 +161,20 @@ fun BottomNav(
                                 }
                             )
                             .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
+                                interactionSource = remember(tab) { MutableInteractionSource() },
                                 indication = null,
                                 role = Role.Tab,
                                 onClick = { onTabSelected(tab) }
                             )
-                            .testTag("nav_tab_${tab.name.lowercase()}"),
+                            .testTag(if (isChatTab) "nav_tab_chat" else "nav_tab_${tab.name.lowercase()}"),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center,
-                            modifier = Modifier.scale(animatedScale)
+                            modifier = Modifier
+                                .scale(animatedScale)
+                                .then(if (isChatTab) Modifier.testTag("nav_tab_conversation") else Modifier)
                         ) {
                             Box(
                                 modifier = Modifier

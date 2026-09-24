@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.jarvis.model.JarvisState
 import com.example.jarvis.ui.components.ChatGPTVoiceOrb
+import com.example.jarvis.ui.components.HolographicJarvisCore3D
 
 @Composable
 fun VoiceScreen(
@@ -168,42 +169,29 @@ fun VoiceScreen(
                 }
             }
 
-            // Central Area: Live Fluid Orb & Status Text
+            // Central Area: Real states from bridge and brain
             val isActuallySpeaking = isSpeaking || jarvisState == JarvisState.SPEAKING
             val isActuallyThinking = jarvisState == JarvisState.THINKING
-            val isActuallyListening = isListening || jarvisState == JarvisState.LISTENING
+            // Real microphone state: strictly true only when bridge mic is actively listening and unmuted
+            val isActuallyListening = isListening && !isActuallySpeaking && !isActuallyThinking && !isMicMuted
 
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
                 modifier = Modifier.weight(1f)
             ) {
-                // Fluid Voice Orb with tap to interrupt
-                ChatGPTVoiceOrb(
-                    size = 270.dp,
-                    isActive = isActuallyListening || isActuallySpeaking || isActuallyThinking,
-                    isSpeaking = isActuallySpeaking,
+                // Premium 3D Holographic JARVIS Core with tap to interrupt
+                HolographicJarvisCore3D(
+                    size = 280.dp,
+                    state = jarvisState,
                     isListening = isActuallyListening,
-                    audioRmsDb = voiceRmsDb,
-                    primaryColor = when {
-                        isActuallySpeaking -> Color(0xFF2563EB)
-                        isActuallyThinking -> Color(0xFF8B5CF6)
-                        else -> Color(0xFF00B4D8)
-                    },
-                    secondaryColor = when {
-                        isActuallySpeaking -> Color(0xFF60A5FA)
-                        isActuallyThinking -> Color(0xFFA78BFA)
-                        else -> Color(0xFF90E0EF)
-                    },
-                    cloudColor = when {
-                        isActuallySpeaking -> Color(0xFFDBEAFE)
-                        isActuallyThinking -> Color(0xFFEDE9FE)
-                        else -> Color(0xFFCAF0F8)
-                    },
-                    modifier = Modifier.clickable {
+                    isSpeaking = isActuallySpeaking,
+                    isThinking = isActuallyThinking,
+                    audioRmsDb = if (isActuallyListening) voiceRmsDb else 0f,
+                    onClick = {
                         if (isActuallySpeaking) {
                             onInterruptAndListen()
-                        } else if (!isActuallyListening && !isActuallyThinking) {
+                        } else if (!isActuallyListening && !isActuallyThinking && !isMicMuted) {
                             onStartListening()
                         }
                     }
@@ -211,14 +199,14 @@ fun VoiceScreen(
 
                 Spacer(modifier = Modifier.height(28.dp))
 
-                // Status message or live transcription
+                // Real status message or live transcription (strictly reflects real state)
                 val statusText = when {
+                    isMicMuted -> "Microphone muted"
                     isActuallySpeaking -> "Speaking..."
                     isActuallyThinking -> "Thinking..."
                     isActuallyListening && liveTranscript.isNotBlank() -> liveTranscript
                     isActuallyListening -> "Listening..."
-                    isMicMuted -> "Microphone muted"
-                    else -> "Listening..."
+                    else -> "Ready"
                 }
 
                 Text(
