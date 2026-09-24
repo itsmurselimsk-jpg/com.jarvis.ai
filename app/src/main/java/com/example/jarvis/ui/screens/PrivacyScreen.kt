@@ -162,6 +162,60 @@ fun PrivacyScreen(
             }
         }
 
+        // Acoustic Shield & Secret Redaction Guard (JARVIS Intelligence Enclave)
+        item {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFF07111E))
+                    .border(0.5.dp, JarvisCyan.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                    .padding(16.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "INTELLIGENCE ENCLAVE & ACOUSTIC SHIELD",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        color = JarvisCyan
+                    )
+
+                    PrivacyRowItem(
+                        title = "Acoustic Echo Shield",
+                        status = "ONLINE (Suppresses self-listening feedback from TTS)",
+                        isPositive = true,
+                        actionLabel = null,
+                        onAction = {}
+                    )
+
+                    PrivacyRowItem(
+                        title = "Secret Redaction Guard",
+                        status = "ACTIVE (AWS, OpenAI, Stripe, JWT & Card scrubbing)",
+                        isPositive = true,
+                        actionLabel = null,
+                        onAction = {}
+                    )
+
+                    PrivacyRowItem(
+                        title = "Total Redacted Tokens",
+                        status = "${com.example.jarvis.security.PrivacyRedactionGuard.totalRedactions} sensitive items sanitized",
+                        isPositive = true,
+                        actionLabel = null,
+                        onAction = {}
+                    )
+
+                    PrivacyRowItem(
+                        title = "Compound Task Planner",
+                        status = "ONLINE (Multi-step query decomposition & execution)",
+                        isPositive = true,
+                        actionLabel = null,
+                        onAction = {}
+                    )
+                }
+            }
+        }
+
         // 2. Persisted Local Footprint
         item {
             Box(

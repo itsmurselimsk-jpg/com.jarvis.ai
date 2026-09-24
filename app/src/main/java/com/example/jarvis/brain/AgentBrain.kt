@@ -274,9 +274,42 @@ class AgentBrain(
 
             val contextString = contextBuilder.toString().trimEnd()
 
+            // Extract facts into long-term knowledge graph
+            com.example.jarvis.memory.KnowledgeGraphEngine.extractFactsFromConversation(input)
+
             // 1b. Intent Classification & Language Style
             val intentResult = com.example.jarvis.intent.IntentClassifier.classify(input)
             val langStyle = com.example.jarvis.personality.JarvisPersonality.detectLanguageStyle(input)
+
+            // Check and execute compound multi-step task if detected
+            if (com.example.jarvis.brain.CompoundTaskPlanner.isCompoundQuery(input)) {
+                val subSteps = com.example.jarvis.brain.CompoundTaskPlanner.decomposeIntoSubSteps(input)
+                if (subSteps.size > 1) {
+                    _currentPlanExplanation.value = "Executing multi-step compound query (${subSteps.size} steps)..."
+                    val executionResults = com.example.jarvis.brain.CompoundTaskPlanner.executeSubSteps(
+                        subSteps = subSteps,
+                        registry = registry,
+                        context = ToolContext(
+                            repository = repository,
+                            bridge = bridge,
+                            activeVisionResult = activeVisionResult,
+                            activeDocument = activeDocument,
+                            activeDocumentSummary = activeDocumentSummary,
+                            activeFileAnalysis = activeFileAnalysis,
+                            previousDocument = previousDocument,
+                            previousFileAnalysis = previousFileAnalysis,
+                            fileGenerationPipeline = fileGenerationPipeline,
+                            aiProvider = aiProvider
+                        ),
+                        lang = langStyle
+                    )
+                    val report = com.example.jarvis.brain.CompoundTaskPlanner.formatCompoundExecutionReport(executionResults, langStyle)
+                    recordTurn(input, report)
+                    repository.addMessage(ChatMessage(sender = MessageSender.JARVIS, text = report))
+                    deliverFinalResponse(report, onSpeaking, onIdle)
+                    return@launch
+                }
+            }
 
             if (intentResult.intent == com.example.jarvis.intent.ConversationIntent.CLARIFICATION) {
                 val clarQuestion = intentResult.clarificationQuestion ?: "Kya aap thoda clear bol sakte hain?"
@@ -285,12 +318,13 @@ class AgentBrain(
                 return@launch
             }
 
-            // 2. Memory Retrieval
-            val relevantMemories = if (intentResult.intent == com.example.jarvis.intent.ConversationIntent.GREETING ||
-                intentResult.intent == com.example.jarvis.intent.ConversationIntent.CASUAL_CONVERSATION) {
-                ""
+            // 2. Memory Retrieval with Recall Gating & Knowledge Graph
+            val relevantMemories = if (com.example.jarvis.memory.RecallGatingEngine.shouldRecall(input, conversationBuffer)) {
+                val dbMem = retrieveRelevantMemories(input)
+                val graphDigest = com.example.jarvis.memory.KnowledgeGraphEngine.getRelevantKnowledgeDigest(input)
+                listOfNotNull(dbMem.takeIf { it.isNotBlank() }, graphDigest).joinToString("\n\n")
             } else {
-                retrieveRelevantMemories(input)
+                ""
             }
 
             // 3. AI Planning & Tool Selection
@@ -382,12 +416,23 @@ class AgentBrain(
                 val streamingMessage = ChatMessage(sender = MessageSender.JARVIS, text = "", isStreaming = true)
                 repository.addMessage(streamingMessage)
 
-                val prompt = buildString {
+                val prompt = com.example.jarvis.security.PrivacyRedactionGuard.redact(buildString {
                     if (relevantMemories.isNotBlank()) {
                         appendLine(relevantMemories)
                     }
                     appendLine(contextString)
                     appendLine("User: $input")
+                })
+
+                val dynamicSystemInstruction = if (repository.settings.value.systemPrompt.isNotBlank() &&
+                    !repository.settings.value.systemPrompt.startsWith("You are JARVIS, an advanced")
+                ) {
+                    repository.settings.value.systemPrompt
+                } else {
+                    com.example.jarvis.personality.JarvisPersonality.getSystemPrompt(
+                        langStyle,
+                        com.example.jarvis.memory.KnowledgeGraphEngine.getRelevantKnowledgeDigest(input)
+                    )
                 }
 
                 val finalResponse = try {
@@ -409,7 +454,7 @@ class AgentBrain(
                     ) {
                         aiProvider.generateResponse(
                             prompt = prompt,
-                            systemInstruction = repository.settings.value.systemPrompt,
+                            systemInstruction = dynamicSystemInstruction,
                             onChunkReceived = { chunk ->
                                 repository.updateStreamingMessage(chunk)
                             }

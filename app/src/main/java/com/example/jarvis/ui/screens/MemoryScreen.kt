@@ -2,6 +2,7 @@ package com.example.jarvis.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,6 +28,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -123,52 +125,203 @@ fun MemoryScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Search bar
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            placeholder = { Text("Filter memory records...", fontSize = 12.sp, color = JarvisTextDim) },
-            leadingIcon = { Icon(imageVector = Icons.Default.Search, contentDescription = null, tint = JarvisTextDim) },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = JarvisCyan,
-                unfocusedBorderColor = JarvisBorder,
-                focusedTextColor = JarvisTextPrimary,
-                unfocusedTextColor = JarvisTextPrimary
-            ),
-            singleLine = true
-        )
+        var selectedTab by remember { mutableStateOf(0) }
+        val graphNodes by com.example.jarvis.memory.KnowledgeGraphEngine.nodes.collectAsState()
 
-        Spacer(modifier = Modifier.height(14.dp))
-
-        // Memories List
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+        // Tab Selector: Memory Logs vs Knowledge Graph
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color(0xFF090E1A))
+                .border(0.5.dp, JarvisBorderSubtle, RoundedCornerShape(8.dp))
+                .padding(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            if (filtered.isEmpty()) {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 40.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "No matching memories found in operating layer.",
-                            fontSize = 12.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = JarvisTextDim
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(if (selectedTab == 0) JarvisCyan.copy(alpha = 0.2f) else Color.Transparent)
+                    .border(
+                        if (selectedTab == 0) 1.dp else 0.dp,
+                        if (selectedTab == 0) JarvisCyan else Color.Transparent,
+                        RoundedCornerShape(6.dp)
+                    )
+                    .clickable { selectedTab = 0 }
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "RECORDS (${memories.size})",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    color = if (selectedTab == 0) JarvisCyan else JarvisTextDim,
+                    modifier = Modifier.testTag("tab_records")
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(if (selectedTab == 1) JarvisCyan.copy(alpha = 0.2f) else Color.Transparent)
+                    .border(
+                        if (selectedTab == 1) 1.dp else 0.dp,
+                        if (selectedTab == 1) JarvisCyan else Color.Transparent,
+                        RoundedCornerShape(6.dp)
+                    )
+                    .clickable { selectedTab = 1 }
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "KNOWLEDGE GRAPH (${graphNodes.size})",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    color = if (selectedTab == 1) JarvisCyan else JarvisTextDim,
+                    modifier = Modifier.testTag("tab_knowledge_graph")
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        if (selectedTab == 0) {
+            // Search bar
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text("Filter memory records...", fontSize = 12.sp, color = JarvisTextDim) },
+                leadingIcon = { Icon(imageVector = Icons.Default.Search, contentDescription = null, tint = JarvisTextDim) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = JarvisCyan,
+                    unfocusedBorderColor = JarvisBorder,
+                    focusedTextColor = JarvisTextPrimary,
+                    unfocusedTextColor = JarvisTextPrimary
+                ),
+                singleLine = true
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Memories List
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                if (filtered.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 40.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "No matching memories found in operating layer.",
+                                fontSize = 12.sp,
+                                fontFamily = FontFamily.Monospace,
+                                color = JarvisTextDim
+                            )
+                        }
+                    }
+                } else {
+                    items(filtered, key = { it.id }) { mem ->
+                        MemoryCard(
+                            memory = mem,
+                            onDelete = { onDeleteMemory(mem.id) }
                         )
                     }
                 }
-            } else {
-                items(filtered, key = { it.id }) { mem ->
-                    MemoryCard(
-                        memory = mem,
-                        onDelete = { onDeleteMemory(mem.id) }
+            }
+        } else {
+            // Knowledge Graph view
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                item {
+                    Text(
+                        text = "AUTONOMOUS EXTRACTED USER CONCEPTS & RELATIONS",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        color = JarvisCyan
                     )
+                }
+
+                if (graphNodes.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 40.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Knowledge graph active. Talk to Jarvis to extract entity concepts.",
+                                fontSize = 12.sp,
+                                color = JarvisTextDim,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+                } else {
+                    items(graphNodes) { node ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFF090E1A))
+                                .border(0.5.dp, JarvisBorderSubtle, RoundedCornerShape(10.dp))
+                                .padding(14.dp)
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = node.label,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = JarvisCyanBright,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(JarvisCyan.copy(alpha = 0.15f))
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = node.category.uppercase(Locale.ROOT),
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = JarvisCyan
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = node.value,
+                                    fontSize = 12.sp,
+                                    color = JarvisTextPrimary
+                                )
+                                Text(
+                                    text = "Confidence: ${(node.confidence * 100).toInt()}% • Relation active",
+                                    fontSize = 10.sp,
+                                    color = JarvisTextDim,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

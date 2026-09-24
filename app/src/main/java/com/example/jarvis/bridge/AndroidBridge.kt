@@ -98,8 +98,10 @@ class AndroidBridge(private val context: Context) {
     private var onUtteranceDoneCallback: ((String?) -> Unit)? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     private var torchCallback: CameraManager.TorchCallback? = null
+    val echoDetector = com.example.jarvis.voice.EchoDetectionEngine()
 
     init {
+        com.example.jarvis.memory.KnowledgeGraphEngine.initialize(context)
         initTts()
         initSpeechRecognizer()
         initTorchMonitoring()
@@ -128,10 +130,12 @@ class AndroidBridge(private val context: Context) {
                     }
                     override fun onDone(utteranceId: String?) {
                         _isSpeaking.value = false
+                        echoDetector.notifyTtsFinished()
                         onUtteranceDoneCallback?.invoke(utteranceId)
                     }
                     override fun onError(utteranceId: String?) {
                         _isSpeaking.value = false
+                        echoDetector.notifyTtsFinished()
                     }
                 })
             }
@@ -163,9 +167,14 @@ class AndroidBridge(private val context: Context) {
                             _isListening.value = false
                             val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                             val recognized = matches?.firstOrNull() ?: ""
-                            if (recognized.isNotBlank()) {
-                                _liveTranscript.value = recognized
-                                onSpeechResultCallback?.invoke(recognized)
+                            val cleaned = echoDetector.cleanupLeadingEcho(recognized)
+                            if (cleaned.isNotBlank()) {
+                                if (echoDetector.shouldRejectAsEcho(cleaned)) {
+                                    Log.d("AndroidBridge", "Echo Shield: Ignored self-feedback echo: $cleaned")
+                                    return
+                                }
+                                _liveTranscript.value = cleaned
+                                onSpeechResultCallback?.invoke(cleaned)
                             }
                         }
                         override fun onPartialResults(partialResults: Bundle?) {
@@ -401,11 +410,13 @@ class AndroidBridge(private val context: Context) {
             }
         }
         _isSpeaking.value = true
+        echoDetector.notifyTtsStarted(sanitizedText)
         val params = Bundle()
         params.putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId)
         val result = textToSpeech?.speak(sanitizedText, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
         if (result != TextToSpeech.SUCCESS) {
             _isSpeaking.value = false
+            echoDetector.notifyTtsFinished()
             abandonAudioFocus()
             onDone?.invoke()
         }
