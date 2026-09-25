@@ -30,7 +30,8 @@ object LanguageDetector {
         val lower = text.lowercase()
         val bengaliPhonetics = listOf(
             "kholo", "koro", "bondho", "koto", "chalao", "thamao", "bolo",
-            "khule dao", "on koro", "off koro", "shuncho", "ki obostha", "musa ke", "musake"
+            "khule dao", "on koro", "off koro", "shuncho", "ki obostha", "musa ke", "musake",
+            "bangla", "bangla bolo", "kemon acho", "tumi ke", "ki khobor", "kichu bolo", "bhalo", "valo"
         )
         if (bengaliPhonetics.any { lower.contains(it) }) {
             return DetectedLanguage.BENGALI

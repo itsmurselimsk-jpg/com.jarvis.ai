@@ -37,7 +37,8 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Human Voice Synthesis Engine for J.A.R.V.I.S.
- * Bridges Gemini Studio Cloud Human Voice generation with on-device Neural WaveNet TTS.
+ * Ultra-natural conversational speech model comparable to ChatGPT Voice Mode.
+ * Bridges Gemini Studio High-Fidelity Neural Speech Generation with on-device Neural WaveNet TTS.
  */
 object HumanVoiceEngine {
     private const val TAG = "HumanVoiceEngine"
@@ -56,13 +57,16 @@ object HumanVoiceEngine {
 
     private val httpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
-            .connectTimeout(12, TimeUnit.SECONDS)
-            .readTimeout(20, TimeUnit.SECONDS)
-            .writeTimeout(15, TimeUnit.SECONDS)
+            .connectTimeout(25, TimeUnit.SECONDS)
+            .readTimeout(35, TimeUnit.SECONDS)
+            .writeTimeout(20, TimeUnit.SECONDS)
             .build()
     }
 
     private var audioFocusRequest: AudioFocusRequest? = null
+
+    // Supported Gemini prebuilt voices
+    private val validGeminiVoices = setOf("Puck", "Charon", "Kore", "Fenrir", "Aoede")
 
     /**
      * Primary entry point for speaking text with human realism.
@@ -99,11 +103,15 @@ object HumanVoiceEngine {
         if (canUseGeminiStudio) {
             _isSpeaking.value = true
             activeSpeechJob = scope.launch {
+                val candidateVoice = effectiveSettings.geminiVoiceName.ifBlank { voiceProfile.geminiVoiceName }
+                val targetVoice = if (validGeminiVoices.contains(candidateVoice)) candidateVoice else "Puck"
+
                 val success = synthesizeWithGeminiStudio(
                     context = context,
                     text = cleanedText,
                     apiKey = apiKey,
-                    voiceName = effectiveSettings.geminiVoiceName.ifBlank { voiceProfile.geminiVoiceName },
+                    voiceName = targetVoice,
+                    bridge = bridge,
                     onDone = {
                         _isSpeaking.value = false
                         onDone?.invoke()
@@ -140,115 +148,216 @@ object HumanVoiceEngine {
 
     /**
      * Call Gemini TTS API with AUDIO response modality and prebuilt voice configuration.
+     * Uses approved gemini-2.5-flash-preview-tts and gemini-2.5-flash models.
      */
     private suspend fun synthesizeWithGeminiStudio(
         context: Context,
         text: String,
         apiKey: String,
         voiceName: String,
+        bridge: AndroidBridge,
         onDone: () -> Unit
     ): Boolean = withContext(Dispatchers.IO) {
-        try {
-            val model = "gemini-2.0-flash"
-            val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
+        val modelsToTry = listOf("gemini-2.5-flash-preview-tts", "gemini-2.5-flash")
 
-            val prompt = "Speak naturally as J.A.R.V.I.S., a helpful, intelligent personal AI assistant: $text"
+        val isBengali = text.any { it in '\u0980'..'\u09FF' } ||
+                LanguageDetector.detectLanguage(text) == LanguageDetector.DetectedLanguage.BENGALI
 
-            val rootJson = JSONObject()
-            val contentsArray = JSONArray()
-            val contentObj = JSONObject()
-            val partsArray = JSONArray()
-            partsArray.put(JSONObject().put("text", prompt))
-            contentObj.put("parts", partsArray)
-            contentsArray.put(contentObj)
-            rootJson.put("contents", contentsArray)
+        val prompt = if (isBengali) {
+            "Say in ultra-natural conversational human warmth with clear Bengali pronunciation: $text"
+        } else {
+            "Say in ultra-natural conversational human warmth and expressive inflection: $text"
+        }
 
-            // Generation config with AUDIO modality & Voice Name
-            val genConfig = JSONObject()
-            val modalities = JSONArray().apply { put("AUDIO") }
-            genConfig.put("responseModalities", modalities)
-
-            val speechConfig = JSONObject()
-            val voiceConfig = JSONObject()
-            val prebuilt = JSONObject().put("voiceName", voiceName)
-            voiceConfig.put("prebuiltVoiceConfig", prebuilt)
-            speechConfig.put("voiceConfig", voiceConfig)
-            genConfig.put("speechConfig", speechConfig)
-
-            rootJson.put("generationConfig", genConfig)
-
-            val body = rootJson.toString().toRequestBody("application/json".toMediaType())
-            val request = Request.Builder().url(url).post(body).build()
-
-            val response = httpClient.newCall(request).execute()
-            if (!response.isSuccessful) {
-                Log.w(TAG, "Gemini Studio TTS returned HTTP ${response.code}: ${response.body?.string()}")
-                return@withContext false
+        val rootJson = JSONObject().apply {
+            val contentsArray = JSONArray().apply {
+                val contentObj = JSONObject().apply {
+                    val partsArray = JSONArray().apply {
+                        put(JSONObject().put("text", prompt))
+                    }
+                    put("parts", partsArray)
+                }
+                put(contentObj)
             }
+            put("contents", contentsArray)
 
-            val responseBody = response.body?.string() ?: return@withContext false
-            val parsed = JSONObject(responseBody)
-            val parts = parsed.optJSONArray("candidates")
-                ?.optJSONObject(0)
-                ?.optJSONObject("content")
-                ?.optJSONArray("parts")
+            val genConfig = JSONObject().apply {
+                val modalities = JSONArray().apply { put("AUDIO") }
+                put("responseModalities", modalities)
 
-            var base64Audio: String? = null
-            var mimeType = "audio/wav"
+                val speechConfig = JSONObject().apply {
+                    val voiceConfig = JSONObject().apply {
+                        val prebuilt = JSONObject().put("voiceName", voiceName)
+                        put("prebuiltVoiceConfig", prebuilt)
+                    }
+                    put("voiceConfig", voiceConfig)
+                }
+                put("speechConfig", speechConfig)
+            }
+            put("generationConfig", genConfig)
+        }
 
-            if (parts != null) {
-                for (idx in 0 until parts.length()) {
-                    val part = parts.optJSONObject(idx) ?: continue
-                    val inlineData = part.optJSONObject("inlineData")
-                    if (inlineData != null) {
-                        base64Audio = inlineData.optString("data")
-                        mimeType = inlineData.optString("mimeType", "audio/wav")
-                        break
+        val requestBodyString = rootJson.toString()
+
+        for (model in modelsToTry) {
+            try {
+                val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
+                val body = requestBodyString.toRequestBody("application/json".toMediaType())
+                val request = Request.Builder().url(url).post(body).build()
+
+                val response = httpClient.newCall(request).execute()
+                if (!response.isSuccessful) {
+                    val err = response.body?.string()
+                    Log.w(TAG, "Gemini Studio model $model returned HTTP ${response.code}: $err")
+                    continue
+                }
+
+                val responseBody = response.body?.string() ?: continue
+                val parsed = JSONObject(responseBody)
+                val parts = parsed.optJSONArray("candidates")
+                    ?.optJSONObject(0)
+                    ?.optJSONObject("content")
+                    ?.optJSONArray("parts")
+
+                var base64Audio: String? = null
+                var mimeType = "audio/wav"
+
+                if (parts != null) {
+                    for (idx in 0 until parts.length()) {
+                        val part = parts.optJSONObject(idx) ?: continue
+                        val inlineData = part.optJSONObject("inlineData")
+                        if (inlineData != null) {
+                            base64Audio = inlineData.optString("data")
+                            mimeType = inlineData.optString("mimeType", "audio/wav")
+                            break
+                        }
                     }
                 }
-            }
 
-            if (base64Audio.isNullOrBlank()) {
-                Log.w(TAG, "No audio inlineData found in Gemini response")
-                return@withContext false
-            }
+                if (base64Audio.isNullOrBlank()) {
+                    Log.w(TAG, "No audio inlineData found in model $model response")
+                    continue
+                }
 
-            val audioBytes = Base64.decode(base64Audio, Base64.DEFAULT)
-            if (audioBytes == null || audioBytes.isEmpty()) {
-                return@withContext false
-            }
+                val rawAudioBytes = Base64.decode(base64Audio, Base64.DEFAULT)
+                if (rawAudioBytes == null || rawAudioBytes.isEmpty()) {
+                    continue
+                }
 
-            // Write to local cache file
-            val extension = if (mimeType.contains("mp3")) "mp3" else "wav"
-            val tempFile = File(context.cacheDir, "jarvis_human_voice_${System.currentTimeMillis()}.$extension")
-            FileOutputStream(tempFile).use { fos ->
-                fos.write(audioBytes)
-                fos.flush()
-            }
+                val playableBytes = ensurePlayableAudio(rawAudioBytes, mimeType)
 
-            withContext(Dispatchers.Main) {
-                playAudioFile(context, tempFile, voiceName, onDone)
+                // Write to cache file
+                val extension = if (mimeType.contains("mp3")) "mp3" else "wav"
+                val tempFile = File(context.cacheDir, "jarvis_human_voice_${System.currentTimeMillis()}.$extension")
+                FileOutputStream(tempFile).use { fos ->
+                    fos.write(playableBytes)
+                    fos.flush()
+                }
+
+                withContext(Dispatchers.Main) {
+                    playAudioFile(context, tempFile, voiceName, bridge, onDone)
+                }
+                return@withContext true
+            } catch (e: Exception) {
+                Log.e(TAG, "Error synthesizing with model $model", e)
             }
-            return@withContext true
-        } catch (e: Exception) {
-            Log.e(TAG, "Error in synthesizeWithGeminiStudio", e)
-            return@withContext false
         }
+        return@withContext false
     }
 
     /**
-     * Plays generated audio file via MediaPlayer with proper audio focus and cleanup.
+     * Guarantees raw PCM or WAV audio bytes can be played seamlessly by Android MediaPlayer.
+     */
+    private fun ensurePlayableAudio(bytes: ByteArray, mimeType: String): ByteArray {
+        if (bytes.size < 4) return bytes
+
+        // Already has RIFF WAV header
+        if (bytes[0] == 'R'.code.toByte() && bytes[1] == 'I'.code.toByte() &&
+            bytes[2] == 'F'.code.toByte() && bytes[3] == 'F'.code.toByte()) {
+            return bytes
+        }
+
+        // Already has MP3 header (ID3 or sync word)
+        if ((bytes.size >= 3 && bytes[0] == 'I'.code.toByte() && bytes[1] == 'D'.code.toByte() && bytes[2] == '3'.code.toByte()) ||
+            (bytes.size >= 2 && (bytes[0].toInt() and 0xFF) == 0xFF && (bytes[1].toInt() and 0xE0) == 0xE0)) {
+            return bytes
+        }
+
+        // Raw PCM: prepend 44-byte standard RIFF header at 24000Hz (or 16000Hz) mono 16-bit
+        val sampleRate = if (mimeType.contains("16000")) 16000 else 24000
+        return wrapPcmInWav(bytes, sampleRate = sampleRate, channels = 1)
+    }
+
+    private fun wrapPcmInWav(pcmData: ByteArray, sampleRate: Int = 24000, channels: Int = 1): ByteArray {
+        val totalAudioLen = pcmData.size.toLong()
+        val totalDataLen = totalAudioLen + 36
+        val byteRate = sampleRate * channels * 2
+        val header = ByteArray(44)
+        header[0] = 'R'.code.toByte()
+        header[1] = 'I'.code.toByte()
+        header[2] = 'F'.code.toByte()
+        header[3] = 'F'.code.toByte()
+        header[4] = (totalDataLen and 0xff).toByte()
+        header[5] = ((totalDataLen shr 8) and 0xff).toByte()
+        header[6] = ((totalDataLen shr 16) and 0xff).toByte()
+        header[7] = ((totalDataLen shr 24) and 0xff).toByte()
+        header[8] = 'W'.code.toByte()
+        header[9] = 'A'.code.toByte()
+        header[10] = 'V'.code.toByte()
+        header[11] = 'E'.code.toByte()
+        header[12] = 'f'.code.toByte()
+        header[13] = 'm'.code.toByte()
+        header[14] = 't'.code.toByte()
+        header[15] = ' '.code.toByte()
+        header[16] = 16
+        header[17] = 0
+        header[18] = 0
+        header[19] = 0
+        header[20] = 1 // PCM format
+        header[21] = 0
+        header[22] = channels.toByte()
+        header[23] = 0
+        header[24] = (sampleRate and 0xff).toByte()
+        header[25] = ((sampleRate shr 8) and 0xff).toByte()
+        header[26] = ((sampleRate shr 16) and 0xff).toByte()
+        header[27] = ((sampleRate shr 24) and 0xff).toByte()
+        header[28] = (byteRate and 0xff).toByte()
+        header[29] = ((byteRate shr 8) and 0xff).toByte()
+        header[30] = ((byteRate shr 16) and 0xff).toByte()
+        header[31] = ((byteRate shr 24) and 0xff).toByte()
+        header[32] = (channels * 2).toByte()
+        header[33] = 0
+        header[34] = 16 // 16-bit
+        header[35] = 0
+        header[36] = 'd'.code.toByte()
+        header[37] = 'a'.code.toByte()
+        header[38] = 't'.code.toByte()
+        header[39] = 'a'.code.toByte()
+        header[40] = (totalAudioLen and 0xff).toByte()
+        header[41] = ((totalAudioLen shr 8) and 0xff).toByte()
+        header[42] = ((totalAudioLen shr 16) and 0xff).toByte()
+        header[43] = ((totalAudioLen shr 24) and 0xff).toByte()
+
+        val out = ByteArray(44 + pcmData.size)
+        System.arraycopy(header, 0, out, 0, 44)
+        System.arraycopy(pcmData, 0, out, 44, pcmData.size)
+        return out
+    }
+
+    /**
+     * Plays generated audio file via MediaPlayer with proper audio focus and barge-in monitoring.
      */
     private fun playAudioFile(
         context: Context,
         file: File,
         voiceName: String,
+        bridge: AndroidBridge,
         onDone: () -> Unit
     ) {
         try {
-            stopAudio()
+            stopAudio(bridge)
             activeAudioFile = file
-            _lastVoiceUsed.value = "Gemini Studio ($voiceName)"
+            _lastVoiceUsed.value = "Gemini Ultra Voice ($voiceName)"
 
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
             requestAudioFocus(audioManager)
@@ -263,12 +372,14 @@ object HumanVoiceEngine {
                 setDataSource(file.absolutePath)
                 prepare()
                 setOnCompletionListener {
+                    bridge.stopBargeInMonitoring()
                     abandonAudioFocus(audioManager)
                     cleanActiveAudioFile()
                     _isSpeaking.value = false
                     onDone()
                 }
                 setOnErrorListener { _, _, _ ->
+                    bridge.stopBargeInMonitoring()
                     abandonAudioFocus(audioManager)
                     cleanActiveAudioFile()
                     _isSpeaking.value = false
@@ -277,9 +388,12 @@ object HumanVoiceEngine {
                 }
                 start()
                 _isSpeaking.value = true
+                // Start acoustic barge-in detector so user can interrupt JARVIS speaking at any millisecond
+                bridge.startBargeInMonitoring()
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error playing audio file", e)
+            bridge.stopBargeInMonitoring()
             cleanActiveAudioFile()
             _isSpeaking.value = false
             onDone()
@@ -289,12 +403,13 @@ object HumanVoiceEngine {
     fun stop(bridge: AndroidBridge? = null) {
         activeSpeechJob?.cancel()
         activeSpeechJob = null
-        stopAudio()
+        stopAudio(bridge)
         _isSpeaking.value = false
         bridge?.stopDeviceTts()
     }
 
-    private fun stopAudio() {
+    private fun stopAudio(bridge: AndroidBridge? = null) {
+        bridge?.stopBargeInMonitoring()
         try {
             mediaPlayer?.apply {
                 if (isPlaying) {

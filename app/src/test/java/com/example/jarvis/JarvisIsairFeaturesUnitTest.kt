@@ -91,7 +91,8 @@ class JarvisIsairFeaturesUnitTest {
         assertEquals(LanguageStyle.HINDI, JarvisPersonality.detectLanguageStyle("नमस्ते आप कैसे हैं"))
 
         val systemPrompt = JarvisPersonality.getSystemPrompt(LanguageStyle.HINGLISH, "User fact: developer")
-        assertTrue(systemPrompt.contains("Tony Stark's personal operating system"))
+        assertTrue(systemPrompt.contains("JARVIS"))
+        assertTrue(systemPrompt.contains("Stark"))
         assertTrue(systemPrompt.contains("developer"))
     }
 }

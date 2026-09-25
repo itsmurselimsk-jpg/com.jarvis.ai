@@ -362,6 +362,21 @@ class AndroidBridge(private val context: Context) {
 
     var repository: com.example.jarvis.storage.JarvisRepository? = null
 
+    fun startBargeInMonitoring() {
+        if (bargeInDetector == null) {
+            bargeInDetector = com.example.jarvis.voice.AcousticBargeInDetector(context) {
+                Log.i("AndroidBridge", "Acoustic barge-in detected, stopping audio output immediately")
+                stopSpeaking()
+                onBargeInTriggered?.invoke()
+            }
+        }
+        bargeInDetector?.startMonitoring()
+    }
+
+    fun stopBargeInMonitoring() {
+        bargeInDetector?.stopMonitoring()
+    }
+
     fun speak(
         text: String,
         speechRate: Float = 1.0f,
@@ -445,14 +460,7 @@ class AndroidBridge(private val context: Context) {
         echoDetector.notifyTtsStarted(sanitizedText)
 
         // Real-time acoustic barge-in detector: monitors microphone for user interruption during TTS
-        if (bargeInDetector == null) {
-            bargeInDetector = com.example.jarvis.voice.AcousticBargeInDetector(context) {
-                Log.i("AndroidBridge", "Acoustic barge-in detected, stopping TTS immediately")
-                stopSpeaking()
-                onBargeInTriggered?.invoke()
-            }
-        }
-        bargeInDetector?.startMonitoring()
+        startBargeInMonitoring()
 
         val params = Bundle()
         params.putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId)

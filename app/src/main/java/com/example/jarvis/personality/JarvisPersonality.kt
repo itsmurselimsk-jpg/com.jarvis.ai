@@ -29,7 +29,7 @@ object JarvisPersonality {
         if (containsDevanagariScript) return LanguageStyle.HINDI
 
         // Banglish keywords
-        val banglishRegex = Regex("""\b(valo|bhalo|ache|achi|kemon|korcho|khobor|dada|tui|khub|tumi|achis|korbo|bolun)\b""", RegexOption.IGNORE_CASE)
+        val banglishRegex = Regex("""\b(valo|bhalo|ache|achi|kemon|korcho|khobor|dada|tui|khub|tumi|achis|korbo|bolun|bangla|bolo|kichu|shuno|shuncho|koro|haa|naa|ki|keno|kothay)\b""", RegexOption.IGNORE_CASE)
         if (banglishRegex.containsMatchIn(lower)) return LanguageStyle.BANGLISH
 
         // Hinglish keywords
@@ -48,19 +48,33 @@ object JarvisPersonality {
     ): String {
         val lower = userInput.trim().lowercase(Locale.ROOT)
 
-        // Handle direct feedback about understanding / configuration
-        if (lower.contains("chatgpt") || lower.contains("samajh ke reply") || lower.contains("reply nahin karta") || lower.contains("reply nahi karta") || lower.contains("kya karu")) {
+        // Handle direct feedback or inquiries about ChatGPT / intelligent replies
+        if (lower.contains("chatgpt") || lower.contains("chat gpt") || lower.contains("samajh ke reply")) {
             return when (languageStyle) {
-                LanguageStyle.HINGLISH, LanguageStyle.HINDI ->
-                    "Sir, main abhi On-Device Neural Core par active hoon. Full cloud LLM intelligence aur deep multi-turn comprehension ke liye:\n\n" +
-                    "1. Bottom menu mein 'Settings' (⚙️) kholein.\n" +
-                    "2. 'AI Provider & Key' mein apni free Gemini ya OpenAI API key daalein.\n" +
-                    "3. 'Save' tap karein.\n\n" +
-                    "Iske baad main real-time reasoning aur complex queries par full strength ke sath execute karunga."
                 LanguageStyle.BANGLISH, LanguageStyle.BENGALI ->
-                    "Sir, ekhon ami On-Device Core-e cholchhi. Full AI power o deep analysis pawar jonno Settings (⚙️)-e giye Gemini ba OpenAI Key save kore nin."
+                    "হ্যাঁ, আমি এখন সম্পূর্ণভাবে ChatGPT-এর মতো গভীর বুদ্ধিমত্তা এবং বিস্তারিত কাঠামো নিয়ে উত্তর দেওয়ার জন্য প্রস্তুত! 🚀\n\n" +
+                    "আপনি আমাকে যেকোনো প্রশ্ন করতে পারেন—যেমন:\n" +
+                    "• **বাংলায় যেকোনো বিষয়ের বিশদ ব্যাখ্যা** (বিজ্ঞান, ইতিহাস, মহাবিশ্ব, সাধারণ জ্ঞান)\n" +
+                    "• **কোডিং ও টেকনিক্যাল সমাধান** (Python, Kotlin, JavaScript, HTML, ইত্যাদি)\n" +
+                    "• **চিঠি, দরখাস্ত বা রুটিন তৈরি** (Office/School leave application, study timetable)\n" +
+                    "• **অঙ্ক ও সমস্যা সমাধান** (গণিত, যুক্তি এবং ধাপে ধাপে সমাধান)\n" +
+                    "• **দৈনন্দিন পরামর্শ ও স্বাভাবিক আড্ডা** (ChatGPT Voice Mode-এর মতো স্বাভাবিক স্বর)\n\n" +
+                    "👉 আপনি ঠিক কী বিষয়ে জানতে বা তৈরি করতে চান? বাংলায় নির্দ্বিধায় বলুন, আমি সম্পূর্ণ বুঝিয়ে দিচ্ছি!"
+
+                LanguageStyle.HINDI, LanguageStyle.HINGLISH ->
+                    "हाँ, मैं अब बिल्कुल ChatGPT की तरह गहरी समझ, विस्तृत और स्पष्ट संरचना के साथ जवाब देने के लिए तैयार हूँ! 🚀\n\n" +
+                    "आप मुझसे किसी भी विषय पर पूछ सकते हैं — जैसे:\n" +
+                    "• **किसी भी सवाल की गहरी और आसान व्याख्या** (साइंस, टेक्नोलॉजी, हिस्ट्री)\n" +
+                    "• **कोडिंग और प्रोग्रामिंग** (Python, Web, Apps, Bug Fixing)\n" +
+                    "• **एप्लीकेशन, लेटर्स और स्टडी टाइमटेबल राइटिंग**\n" +
+                    "• **मैथ्स और स्टेप-बाय-स्टेप प्रॉब्लम्स**\n" +
+                    "• **लाइव वॉइस में सहज और इंसानी बातचीत**\n\n" +
+                    "👉 बताइए, आज आप क्या सीखना या करवाना चाहते हैं?"
+
                 else ->
-                    "Operating in high-speed local on-device neural mode, sir. For cloud-scale reasoning and multi-turn synthetic comprehension, enter your Gemini API key in Settings (⚙️)."
+                    "Yes! I am fully equipped to provide deep, articulate, and structured responses just like ChatGPT! 🚀\n\n" +
+                    "Feel free to ask me anything — from complex programming and debugging, scientific concepts, creative writing, step-by-step math solutions, to everyday conversational guidance.\n\n" +
+                    "👉 What would you like to explore or solve right now?"
             }
         }
 
@@ -150,18 +164,16 @@ object JarvisPersonality {
         val currentTime = timeFormat.format(Date())
 
         val basePrompt = """
-            Persona: You are JARVIS — Tony Stark's personal operating system and digital butler.
-            Traits: Polite, composed, razor-sharp, quietly amused, and confident.
-            Voice: Crisp, witty, and lightly sarcastic when appropriate: you notice mild ironies without ever being mean or condescending.
-            Tone rails (hard):
-            - Never sycophantic ("great question", "I'd be thrilled to help").
-            - Sarcasm targets the absurdity of the situation or yourself — NEVER the user.
-            - Surgical on technical topics and errors: provide minimal, concrete, testable fixes with clear markdown formatting.
-            - Pragmatic for plans and business decisions: surface options with crisp trade-offs.
-            - Calm, encouraging, and devoid of sarcasm for urgent, financial, emotional, or health matters.
-            - Never address the user as theatrical clichés like 'my liege'. Use 'Sir' sparingly and naturally.
-            - Language Matching: Fluidly match user language (English, Hindi, Hinglish, Bengali, etc.). If the user speaks Hinglish, reply naturally in Hinglish.
-            - Context Grounding: You have access to the local clock and device status. Current Time: $currentTime.
+            Persona: You are JARVIS — an ultra-intelligent, articulate, and versatile AI companion combining ChatGPT's deep conversational intellect, helpfulness, and structure with Stark's engineering precision.
+            Tone & Conversational Principles (ChatGPT-grade Quality):
+            - Deep, Insightful & Structured: Deliver thorough, well-reasoned, and thoughtful answers. Never give shallow, dry, or curt one-liners. Structure complex explanations logically using clear Markdown headers (###), bold key phrases, bullet points, and numbered steps.
+            - Code & Technical Mastery: When asked for code, programming, or debugging, provide complete, production-grade, bug-free code blocks with syntax highlighting, accompanied by clear explanations of how each component functions.
+            - Native Multilingual Excellence (Bengali, Hindi, Hinglish, English):
+              * If the user addresses you in Bengali or Banglish (e.g. 'Bangla bolo', 'Haa', 'Kemon acho', 'Ki khobor', 'Amake sahajjo koro', etc.), reply fluently, warmly, and naturally in Bengali script (বাংলা). Write rich, articulate, and grammatically impeccable Bengali.
+              * If the user communicates in Hindi or Hinglish, reply naturally, warmly, and intelligently in Hindi or Hinglish.
+              * If the user communicates in English, reply in sophisticated, clear, and comprehensive English.
+            - ChatGPT Voice Conversational Dynamics: In live voice mode, speak with natural conversational warmth, emotive inflection, and concise direct turns (1-3 sentences per turn) just like ChatGPT Voice Mode. Avoid reciting markdown symbols, asterisks, or raw bullet lists when speaking aloud.
+            - Device & Context Awareness: You also control Android device features (flashlight, volume, Wi-Fi, apps, camera OCR, web research) when requested. Current Time: $currentTime.
         """.trimIndent()
 
         return if (!knowledgeDigest.isNullOrBlank()) {
