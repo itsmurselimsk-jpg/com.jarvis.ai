@@ -29,7 +29,7 @@ object JarvisPersonality {
         if (containsDevanagariScript) return LanguageStyle.HINDI
 
         // Banglish keywords
-        val banglishRegex = Regex("""\b(valo|bhalo|ache|achi|kemon|korcho|khobor|dada|tui|khub|tumi|achis|korbo|bolun|bangla|bolo|kichu|shuno|shuncho|koro|haa|naa|ki|keno|kothay)\b""", RegexOption.IGNORE_CASE)
+        val banglishRegex = Regex("""\b(valo|bhalo|ache|achi|kemon|korcho|khobor|dada|tui|khub|tumi|achis|korbo|bolun|bangla|bolo|kichu|shuno|shuncho|koro|haa|naa|ki|keno|kothay|ami|bolchi|bolchhi|amake|amar|apni|apnar)\b""", RegexOption.IGNORE_CASE)
         if (banglishRegex.containsMatchIn(lower)) return LanguageStyle.BANGLISH
 
         // Hinglish keywords
@@ -47,6 +47,38 @@ object JarvisPersonality {
         languageStyle: LanguageStyle = detectLanguageStyle(userInput)
     ): String {
         val lower = userInput.trim().lowercase(Locale.ROOT)
+
+        // Check live training engine guidance first for dynamic behavioral learning
+        val trainingMatch = com.example.jarvis.training.TrainingEngine.matchRelevantTraining(
+            userInput,
+            intent.name,
+            languageStyle.name
+        )
+
+        if (trainingMatch.goodExamples.isNotEmpty()) {
+            val exactGood = trainingMatch.goodExamples.firstOrNull { it.first.equals(lower, ignoreCase = true) }
+            if (exactGood != null) {
+                return exactGood.second
+            }
+            // Pattern learning: If input is a variation of greeting and trained style is friendly/casual
+            if (intent == ConversationIntent.GREETING) {
+                val sampleGood = trainingMatch.goodExamples.first().second
+                if (sampleGood.contains("bol", ignoreCase = true) || sampleGood.contains("bhai", ignoreCase = true) || sampleGood.contains("haan", ignoreCase = true)) {
+                    return when (lower) {
+                        "hello" -> "Hey 😄 Kya hua?"
+                        "hi jarvis" -> "Haan, bol 😄"
+                        "good morning" -> "Good morning bhai ☀️"
+                        else -> "Haan bhai, bol 😄"
+                    }
+                }
+            }
+        }
+
+        // Handle requests to speak in Bangla
+        if (lower.contains("bangla bolo") || lower.contains("banglay bolo") || lower.contains("bangla te bolo") || 
+            lower == "bangla" || lower.contains("বাংলায় বল") || lower.contains("বাংলা বল") || lower == "বাংলা") {
+            return "আমি জার্ভিস বলছি! নিশ্চয়ই স্যার, আমি আপনার সাথে সম্পূর্ণ খাঁটি এবং সাবলীল বাংলায় কথা বলব। আপনার যেকোনো প্রশ্ন, ডিভাইসের কাজ বা তথ্য জানার থাকলে নির্দ্বিধায় বলুন—আমি সম্পূর্ণ প্রস্তুত! 🚀"
+        }
 
         // Handle direct feedback or inquiries about ChatGPT / intelligent replies
         if (lower.contains("chatgpt") || lower.contains("chat gpt") || lower.contains("samajh ke reply")) {
@@ -87,7 +119,8 @@ object JarvisPersonality {
                         lower.contains("jarvis") -> "Hello Sir! Listening, batao kya karna hai?"
                         else -> "Hello bhai, sab ready hai, Sir. Kya instruction hai?"
                     }
-                    LanguageStyle.BANGLISH, LanguageStyle.BENGALI -> "Hi dada! Kemon achhen? Ki chalchhe bolun?"
+                    LanguageStyle.BENGALI -> "আমি জার্ভিস বলছি! নমস্কার স্যার, সব সিস্টেম প্রস্তুত। বলুন আজ কী নির্দেশ?"
+                    LanguageStyle.BANGLISH -> "Ami Jarvis bolchi! Hi dada, kemon achhen? Ki chalchhe bolun?"
                     LanguageStyle.HINDI -> "नमस्ते सर! सब बढ़िया चल रहा है। बताइए आज क्या करना है?"
                     else -> "Hey Sir! How are things going? What can I help you with today?"
                 }

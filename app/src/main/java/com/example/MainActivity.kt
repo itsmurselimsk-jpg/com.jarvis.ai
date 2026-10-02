@@ -16,6 +16,9 @@ class MainActivity : ComponentActivity() {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
 
+    // Initialize Training Engine for live behavioral synchronization
+    com.example.jarvis.training.TrainingEngine.initialize(this)
+
     // Initialize background voice wake service if explicitly enabled by user
     val prefs = getSharedPreferences("jarvis_prefs", MODE_PRIVATE)
     val wakeEnabled = prefs.getBoolean("continuous_wake_enabled", false)

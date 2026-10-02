@@ -351,7 +351,7 @@ object HumanVoiceEngine {
         context: Context,
         file: File,
         voiceName: String,
-        bridge: AndroidBridge,
+        bridge: AndroidBridge? = null,
         onDone: () -> Unit
     ) {
         try {
@@ -372,14 +372,14 @@ object HumanVoiceEngine {
                 setDataSource(file.absolutePath)
                 prepare()
                 setOnCompletionListener {
-                    bridge.stopBargeInMonitoring()
+                    bridge?.stopBargeInMonitoring()
                     abandonAudioFocus(audioManager)
                     cleanActiveAudioFile()
                     _isSpeaking.value = false
                     onDone()
                 }
                 setOnErrorListener { _, _, _ ->
-                    bridge.stopBargeInMonitoring()
+                    bridge?.stopBargeInMonitoring()
                     abandonAudioFocus(audioManager)
                     cleanActiveAudioFile()
                     _isSpeaking.value = false
@@ -389,11 +389,11 @@ object HumanVoiceEngine {
                 start()
                 _isSpeaking.value = true
                 // Start acoustic barge-in detector so user can interrupt JARVIS speaking at any millisecond
-                bridge.startBargeInMonitoring()
+                bridge?.startBargeInMonitoring()
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error playing audio file", e)
-            bridge.stopBargeInMonitoring()
+            bridge?.stopBargeInMonitoring()
             cleanActiveAudioFile()
             _isSpeaking.value = false
             onDone()
@@ -406,6 +406,101 @@ object HumanVoiceEngine {
         stopAudio(bridge)
         _isSpeaking.value = false
         bridge?.stopDeviceTts()
+    }
+
+    /**
+     * Checks for any pre-recorded audio clip for "Ami Jarvis bolchi" (e.g. res/raw/jarvis_intro, res/raw/ami_jarvis, assets, or internal storage)
+     * and plays the exact custom human voice recording.
+     */
+    fun playCustomRecordedClip(
+        context: Context,
+        bridge: AndroidBridge? = null,
+        clipNames: List<String> = listOf("jarvis_intro", "ami_jarvis", "jarvis_voice", "voice_intro", "jarvis_bengali"),
+        onDone: () -> Unit = {}
+    ): Boolean {
+        // 1. Check in res/raw
+        for (name in clipNames) {
+            val resId = context.resources.getIdentifier(name, "raw", context.packageName)
+            if (resId != 0) {
+                try {
+                    stopAudio(bridge)
+                    val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                    requestAudioFocus(audioManager)
+                    _lastVoiceUsed.value = "Custom Recorded Voice ($name)"
+
+                    mediaPlayer = MediaPlayer.create(context, resId)?.apply {
+                        setOnCompletionListener {
+                            bridge?.stopBargeInMonitoring()
+                            abandonAudioFocus(audioManager)
+                            _isSpeaking.value = false
+                            onDone()
+                        }
+                        setOnErrorListener { _, _, _ ->
+                            bridge?.stopBargeInMonitoring()
+                            abandonAudioFocus(audioManager)
+                            _isSpeaking.value = false
+                            onDone()
+                            true
+                        }
+                        start()
+                        _isSpeaking.value = true
+                        bridge?.startBargeInMonitoring()
+                    }
+                    if (mediaPlayer != null) return true
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error playing raw clip $name", e)
+                }
+            }
+        }
+
+        // 2. Check in internal storage filesDir
+        for (name in clipNames) {
+            for (ext in listOf("mp3", "wav", "m4a", "ogg")) {
+                val f = File(context.filesDir, "$name.$ext")
+                if (f.exists() && f.length() > 0) {
+                    playAudioFile(context, f, "Custom User Recording", bridge, onDone)
+                    return true
+                }
+            }
+        }
+
+        // 3. Check assets
+        for (name in clipNames) {
+            for (ext in listOf("mp3", "wav", "m4a", "ogg")) {
+                try {
+                    val afd = context.assets.openFd("$name.$ext")
+                    stopAudio(bridge)
+                    val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                    requestAudioFocus(audioManager)
+                    _lastVoiceUsed.value = "Asset Voice Clip ($name.$ext)"
+
+                    mediaPlayer = MediaPlayer().apply {
+                        setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                        prepare()
+                        setOnCompletionListener {
+                            bridge?.stopBargeInMonitoring()
+                            abandonAudioFocus(audioManager)
+                            _isSpeaking.value = false
+                            onDone()
+                        }
+                        setOnErrorListener { _, _, _ ->
+                            bridge?.stopBargeInMonitoring()
+                            abandonAudioFocus(audioManager)
+                            _isSpeaking.value = false
+                            onDone()
+                            true
+                        }
+                        start()
+                        _isSpeaking.value = true
+                        bridge?.startBargeInMonitoring()
+                    }
+                    afd.close()
+                    return true
+                } catch (_: Exception) {}
+            }
+        }
+
+        return false
     }
 
     private fun stopAudio(bridge: AndroidBridge? = null) {

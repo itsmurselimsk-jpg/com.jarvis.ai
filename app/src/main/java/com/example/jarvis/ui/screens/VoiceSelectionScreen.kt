@@ -65,6 +65,12 @@ import com.example.jarvis.ui.theme.JarvisSurfaceElevated
 import com.example.jarvis.ui.theme.JarvisTextDim
 import com.example.jarvis.ui.theme.JarvisTextPrimary
 import com.example.jarvis.ui.theme.JarvisTextSecondary
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
+import java.io.File
+import java.io.FileOutputStream
 import com.example.jarvis.voice.HumanVoiceEngine
 import com.example.jarvis.voice.SupportedLanguage
 import com.example.jarvis.voice.VoiceProfileType
@@ -168,6 +174,129 @@ fun VoiceSelectionScreen(
                             fontFamily = FontFamily.Monospace,
                             color = JarvisCyanBright
                         )
+                    }
+                }
+            }
+        }
+
+        // Custom Recorded Voice Audio ("Ami Jarvis bolchi")
+        item {
+            val context = LocalContext.current
+            var customAudioExists by remember {
+                mutableStateOf(
+                    File(context.filesDir, "jarvis_intro.mp3").exists() ||
+                    File(context.filesDir, "ami_jarvis.mp3").exists() ||
+                    context.resources.getIdentifier("jarvis_intro", "raw", context.packageName) != 0 ||
+                    context.resources.getIdentifier("ami_jarvis", "raw", context.packageName) != 0
+                )
+            }
+
+            val audioPickerLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.GetContent()
+            ) { uri ->
+                if (uri != null) {
+                    try {
+                        context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                            val dest = File(context.filesDir, "jarvis_intro.mp3")
+                            FileOutputStream(dest).use { outputStream ->
+                                inputStream.copyTo(outputStream)
+                            }
+                            customAudioExists = true
+                            Toast.makeText(context, "Voice recording saved! ('Ami Jarvis bolchi')", Toast.LENGTH_SHORT).show()
+                        }
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "Error saving audio: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xFF0B192E))
+                    .border(1.dp, if (customAudioExists) JarvisCyan else JarvisBorder, RoundedCornerShape(10.dp))
+                    .padding(14.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(
+                                imageVector = Icons.Default.RecordVoiceOver,
+                                contentDescription = null,
+                                tint = if (customAudioExists) JarvisCyanBright else JarvisTextSecondary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "CUSTOM RECORDED VOICE (বাংলা)",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                color = if (customAudioExists) JarvisCyanBright else JarvisTextPrimary
+                            )
+                        }
+                        Text(
+                            text = if (customAudioExists) "VOICE ACTIVE" else "DEFAULT TTS",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            color = if (customAudioExists) JarvisCyan else JarvisAmber
+                        )
+                    }
+
+                    Text(
+                        text = if (customAudioExists)
+                            "Custom voice audio active! JARVIS will play your exact audio clip whenever 'আমি জার্ভিস বলছি' (Ami Jarvis bolchi) is spoken."
+                        else
+                            "Upload your audio clip ('আমি জার্ভিস বলছি') so JARVIS speaks with your exact voice recording instead of computer TTS!",
+                        fontSize = 11.sp,
+                        color = JarvisTextSecondary,
+                        lineHeight = 15.sp
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { audioPickerLauncher.launch("audio/*") },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (customAudioExists) Color(0xFF14243C) else JarvisCyan,
+                                contentColor = if (customAudioExists) JarvisCyan else Color.Black
+                            ),
+                            modifier = Modifier.weight(1f).testTag("upload_custom_voice_button")
+                        ) {
+                            Text(
+                                text = if (customAudioExists) "Change Audio (.mp3/.wav)" else "Upload Voice Audio",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        if (customAudioExists) {
+                            OutlinedButton(
+                                onClick = {
+                                    val played = HumanVoiceEngine.playCustomRecordedClip(context) {}
+                                    if (!played) {
+                                        Toast.makeText(context, "Playing recorded audio clip...", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                modifier = Modifier.testTag("test_custom_audio_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PlayArrow,
+                                    contentDescription = null,
+                                    tint = JarvisCyan,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(text = "Play", fontSize = 11.sp, color = JarvisCyan)
+                            }
+                        }
                     }
                 }
             }

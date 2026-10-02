@@ -321,7 +321,15 @@ object LocalNeuralBrainProvider {
         val textToProcess = if (cleanText.isNotBlank()) cleanText else prompt
         val intentResult = com.example.jarvis.intent.IntentClassifier.classify(textToProcess)
 
-        val response = if (intentResult.intent == com.example.jarvis.intent.ConversationIntent.SYSTEM_STATUS) {
+        val trainingMatch = com.example.jarvis.training.TrainingEngine.matchRelevantTraining(
+            textToProcess,
+            intentResult.intent.name,
+            com.example.jarvis.personality.JarvisPersonality.detectLanguageStyle(textToProcess).name
+        )
+
+        val response = if (trainingMatch.goodExamples.isNotEmpty() || trainingMatch.relevantRules.isNotEmpty()) {
+            com.example.jarvis.personality.JarvisPersonality.generateConversationalResponse(textToProcess, intentResult.intent)
+        } else if (intentResult.intent == com.example.jarvis.intent.ConversationIntent.SYSTEM_STATUS) {
             "All JARVIS subsystems are online. Core matrices, battery, network, Wi-Fi, and autonomous memory stores are operating normally."
         } else {
             JarvisAutonomousBrain.generateAutonomousResponse(textToProcess)
@@ -340,6 +348,21 @@ object LocalNeuralBrainProvider {
 
     fun decideToolLocal(userInput: String, availableTools: List<Pair<String, String>>): ToolDecision {
         val intentResult = com.example.jarvis.intent.IntentClassifier.classify(userInput)
+
+        val trainingMatch = com.example.jarvis.training.TrainingEngine.matchRelevantTraining(
+            userInput,
+            intentResult.intent.name,
+            com.example.jarvis.personality.JarvisPersonality.detectLanguageStyle(userInput).name
+        )
+        if (trainingMatch.preferredTool != null) {
+            return ToolDecision(
+                true,
+                trainingMatch.preferredTool,
+                userInput,
+                "Training rule enforced tool '${trainingMatch.preferredTool}'"
+            )
+        }
+
         if (!intentResult.requiresTool) {
             return ToolDecision(false, null, userInput, "Intent '${intentResult.intent}' is purely conversational")
         }

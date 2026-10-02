@@ -70,6 +70,45 @@
             </intent-filter>
         </activity>
 
+        <!-- JARVIS Trainer: Standalone Training App with its own launcher, taskAffinity, and process -->
+        <activity
+            android:name="com.example.trainer.JarvisTrainerActivity"
+            android:exported="true"
+            android:label="JARVIS Trainer"
+            android:process=":trainer"
+            android:taskAffinity="com.jarvis.trainer"
+            android:launchMode="singleTask"
+            android:theme="@style/Theme.MyApplication">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- JARVIS Training ContentProvider for Live IPC & Shared State -->
+        <provider
+            android:name="com.example.jarvis.training.JarvisTrainingContentProvider"
+            android:authorities="com.jarvis.ai.training.provider"
+            android:exported="true" />
+
+        <!-- JARVIS Training Sync Bound Service for Real-Time Live Connection State -->
+        <service
+            android:name="com.example.jarvis.training.JarvisTrainingSyncService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.jarvis.ai.training.BIND_TRAINER" />
+            </intent-filter>
+        </service>
+
+        <!-- Training Broadcast Receiver for Instant Background / Foreground Updates -->
+        <receiver
+            android:name="com.example.jarvis.training.TrainingBroadcastReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.jarvis.ai.ACTION_TRAINING_APPLIED" />
+            </intent-filter>
+        </receiver>
+
         <!-- Accessibility Service Foundation -->
         <service
             android:name=".jarvis.accessibility.JarvisAccessibilityService"

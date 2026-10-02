@@ -421,6 +421,18 @@ class AndroidBridge(private val context: Context) {
             return
         }
 
+        // If custom audio recording for "Ami Jarvis bolchi" is present, play it directly
+        val isBengaliIntro = sanitizedText.contains("আমি জার্ভিস বলছি") || sanitizedText.contains("Ami Jarvis bolchi")
+        if (isBengaliIntro) {
+            val playedCustom = com.example.jarvis.voice.HumanVoiceEngine.playCustomRecordedClip(context, this) {
+                _isSpeaking.value = false
+                onDone?.invoke()
+            }
+            if (playedCustom) {
+                return
+            }
+        }
+
         if (textToSpeech == null || !isTtsReady) {
             initTts()
             mainHandler.postDelayed({
@@ -430,7 +442,11 @@ class AndroidBridge(private val context: Context) {
         }
 
         requestAudioFocus()
-        val targetLocale = locale ?: (voiceProfile?.preferredLocaleTag?.let { Locale.forLanguageTag(it) } ?: Locale.UK)
+        val targetLocale = locale ?: when {
+            sanitizedText.any { it in '\u0980'..'\u09FF' } -> Locale("bn", "IN")
+            sanitizedText.any { it in '\u0900'..'\u097F' } -> Locale("hi", "IN")
+            else -> voiceProfile?.preferredLocaleTag?.let { Locale.forLanguageTag(it) } ?: Locale.UK
+        }
         try {
             var langRes = textToSpeech?.setLanguage(targetLocale)
             if (langRes == TextToSpeech.LANG_MISSING_DATA || langRes == TextToSpeech.LANG_NOT_SUPPORTED) {

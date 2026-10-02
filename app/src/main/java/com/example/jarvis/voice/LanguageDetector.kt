@@ -62,7 +62,7 @@ object LanguageDetector {
         // English
         Regex("""(?i)\b(hey jarvis|ok jarvis|okay jarvis|hello jarvis|jarvis)\b"""),
         // Bengali
-        Regex("""(?i)\b(জারভিস|হে জারভিস|ওহে জারভিস|জার্ভিস)\b"""),
+        Regex("""(?i)\b(আমি জার্ভিস বলছি|জারভিস|হে জারভিস|ওহে জারভিস|জার্ভিস|ami jarvis bolchi|ami jarvis)\b"""),
         // Hindi
         Regex("""(?i)\b(जार्विस|हे जार्विस|जार्विस)\b""")
     )
@@ -118,7 +118,7 @@ object LanguageDetector {
      */
     fun getWakeGreeting(language: DetectedLanguage): String {
         return when (language) {
-            DetectedLanguage.BENGALI -> "হ্যাঁ স্যার, আমি শুনছি। কীভাবে সাহায্য করতে পারি?"
+            DetectedLanguage.BENGALI -> "আমি জার্ভিস বলছি! হ্যাঁ স্যার, বলুন আজ কীভাবে সাহায্য করতে পারি?"
             DetectedLanguage.HINDI -> "हाँ सर, मैं सुन रहा हूँ। मैं आपकी क्या मदद कर सकता हूँ?"
             DetectedLanguage.ENGLISH -> "Yes Sir, I am listening. How may I assist you?"
         }

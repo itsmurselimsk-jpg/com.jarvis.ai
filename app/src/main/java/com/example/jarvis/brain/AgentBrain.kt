@@ -328,15 +328,29 @@ class AgentBrain(
                 ""
             }
 
+            // 2b. Match Training & Behavioral Context
+            val behavioralContext = com.example.jarvis.training.TrainingEngine.matchRelevantTraining(
+                input = input,
+                intent = intentResult.intent.name,
+                langStyle = langStyle.name
+            )
+
             // 3. AI Planning & Tool Selection
             _currentPlanExplanation.value = "Analyzing intent & selecting tools..."
-            val decision = if (!intentResult.requiresTool) {
+            val decision = if (behavioralContext.preferredTool != null) {
+                com.example.jarvis.provider.ToolDecision(
+                    true,
+                    behavioralContext.preferredTool,
+                    input,
+                    "Enforced by active training rule: ${behavioralContext.preferredTool}"
+                )
+            } else if (!intentResult.requiresTool) {
                 com.example.jarvis.provider.ToolDecision(false, null, input, "Conversational intent: ${intentResult.intent}")
             } else {
                 aiProvider.decideTool(
                     userInput = input,
                     availableTools = registry.getToolDefinitions(),
-                    contextHistory = "$contextString\n$relevantMemories"
+                    contextHistory = "$contextString\n$relevantMemories\n${behavioralContext.promptGuidance}"
                 )
             }
 
@@ -363,11 +377,19 @@ class AgentBrain(
                 _currentPlanExplanation.value = "Selected Tool: ${selectedTool.name} (Risk: ${selectedTool.riskLevel})"
 
                 // 4. Safety Check
-                val assessment = RiskEngine.assessAction(
+                val baseAssessment = RiskEngine.assessAction(
                     actionName = selectedTool.name,
                     actionPayload = toolInput,
                     baseRisk = selectedTool.riskLevel
                 )
+                val assessment = if (behavioralContext.requiresConfirmation && baseAssessment.level == RiskLevel.SAFE) {
+                    baseAssessment.copy(
+                        level = RiskLevel.CONFIRMATION,
+                        reason = "Training rule requires user confirmation before executing ${selectedTool.name}."
+                    )
+                } else {
+                    baseAssessment
+                }
 
                 when (assessment.level) {
                     RiskLevel.RESTRICTED -> {
@@ -428,12 +450,14 @@ class AgentBrain(
                 val dynamicSystemInstruction = if (repository.settings.value.systemPrompt.isNotBlank() &&
                     !repository.settings.value.systemPrompt.startsWith("You are JARVIS, an advanced")
                 ) {
-                    repository.settings.value.systemPrompt
+                    val custom = repository.settings.value.systemPrompt
+                    if (behavioralContext.promptGuidance.isNotBlank()) "$custom\n\n${behavioralContext.promptGuidance}" else custom
                 } else {
-                    com.example.jarvis.personality.JarvisPersonality.getSystemPrompt(
+                    val basePrompt = com.example.jarvis.personality.JarvisPersonality.getSystemPrompt(
                         langStyle,
                         com.example.jarvis.memory.KnowledgeGraphEngine.getRelevantKnowledgeDigest(input)
                     )
+                    if (behavioralContext.promptGuidance.isNotBlank()) "$basePrompt\n\n${behavioralContext.promptGuidance}" else basePrompt
                 }
 
                 val finalResponse = try {
