@@ -61,7 +61,10 @@ object TrainingEngine {
 
         // Apply immediately in memory
         _activeBundle.value = bundle
-        Log.i(TAG, "Applied training bundle v${bundle.version} into live AgentLoop memory!")
+        appContext?.let { ctx ->
+            com.example.jarvis.voice.JarvisVoiceEngine.setVoice(bundle.voiceConfig, ctx)
+        }
+        Log.i(TAG, "Applied training bundle v${bundle.version} into live AgentLoop & VoiceEngine memory!")
 
         if (persist) {
             val ctx = appContext

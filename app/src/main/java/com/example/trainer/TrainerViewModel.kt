@@ -3,8 +3,12 @@ package com.example.trainer
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.jarvis.training.BatchAnalysisSummary
+import com.example.jarvis.training.BatchApplyResult
 import com.example.jarvis.training.BehaviorRule
 import com.example.jarvis.training.ConversationTraining
+import com.example.jarvis.training.ParsedBatchDirective
+import com.example.jarvis.training.PromptBatchTrainingEngine
 import com.example.jarvis.training.SyncResult
 import com.example.jarvis.training.SyncState
 import com.example.jarvis.training.TrainerRepository
@@ -20,9 +24,10 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 enum class TrainerTab(val title: String) {
+    BATCH_PROMPT("Batch Train"),
     BEHAVIORS("Behaviors"),
-    MULTI_TURN("Multi-Turn"),
     RULES("Rules"),
+    MULTI_TURN("Multi-Turn"),
     HISTORY("History"),
     SYNC_DATA("Sync & Data")
 }
@@ -31,8 +36,30 @@ class TrainerViewModel(application: Application) : AndroidViewModel(application)
 
     val repository = TrainerRepository(application)
 
-    private val _selectedTab = MutableStateFlow(TrainerTab.BEHAVIORS)
+    private val _selectedTab = MutableStateFlow(TrainerTab.BATCH_PROMPT)
     val selectedTab: StateFlow<TrainerTab> = _selectedTab.asStateFlow()
+
+    // BATCH PROMPT TRAINING STATE
+    private val _batchPromptText = MutableStateFlow(PromptBatchTrainingEngine.DEFAULT_TEMPLATE)
+    val batchPromptText: StateFlow<String> = _batchPromptText.asStateFlow()
+
+    private val _isAnalyzingPrompt = MutableStateFlow(false)
+    val isAnalyzingPrompt: StateFlow<Boolean> = _isAnalyzingPrompt.asStateFlow()
+
+    private val _isReviewMode = MutableStateFlow(false)
+    val isReviewMode: StateFlow<Boolean> = _isReviewMode.asStateFlow()
+
+    private val _parsedDirectives = MutableStateFlow<List<ParsedBatchDirective>>(emptyList())
+    val parsedDirectives: StateFlow<List<ParsedBatchDirective>> = _parsedDirectives.asStateFlow()
+
+    private val _batchSummary = MutableStateFlow(BatchAnalysisSummary())
+    val batchSummary: StateFlow<BatchAnalysisSummary> = _batchSummary.asStateFlow()
+
+    private val _batchApplyResult = MutableStateFlow<BatchApplyResult?>(null)
+    val batchApplyResult: StateFlow<BatchApplyResult?> = _batchApplyResult.asStateFlow()
+
+    private val _reviewCategoryFilter = MutableStateFlow("All")
+    val reviewCategoryFilter: StateFlow<String> = _reviewCategoryFilter.asStateFlow()
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
@@ -75,6 +102,88 @@ class TrainerViewModel(application: Application) : AndroidViewModel(application)
     fun setTab(tab: TrainerTab) {
         _selectedTab.value = tab
     }
+
+    // --- BATCH PROMPT TRAINING METHODS ---
+
+    fun setBatchPromptText(text: String) {
+        _batchPromptText.value = text
+    }
+
+    fun loadBatchTemplate(template: String) {
+        _batchPromptText.value = template
+        _isReviewMode.value = false
+    }
+
+    fun analyzeBatchPrompt() {
+        viewModelScope.launch {
+            _isAnalyzingPrompt.value = true
+            _syncMessage.value = "Analyzing prompt & structuring directives..."
+            kotlinx.coroutines.delay(150)
+            val directives = PromptBatchTrainingEngine.parseTrainingPrompt(_batchPromptText.value)
+            _parsedDirectives.value = directives
+            _batchSummary.value = PromptBatchTrainingEngine.summarize(directives)
+            _isAnalyzingPrompt.value = false
+            _isReviewMode.value = true
+            _syncMessage.value = "Analyzed ${directives.size} directives. Ready for review."
+        }
+    }
+
+    fun exitReviewMode() {
+        _isReviewMode.value = false
+    }
+
+    fun setReviewCategoryFilter(category: String) {
+        _reviewCategoryFilter.value = category
+    }
+
+    fun toggleDirectiveApproval(id: String) {
+        val updated = _parsedDirectives.value.map {
+            if (it.id == id) it.copy(isApproved = !it.isApproved) else it
+        }
+        _parsedDirectives.value = updated
+        _batchSummary.value = PromptBatchTrainingEngine.summarize(updated)
+    }
+
+    fun updateDirective(directive: ParsedBatchDirective) {
+        val updated = _parsedDirectives.value.map {
+            if (it.id == directive.id) directive else it
+        }
+        _parsedDirectives.value = updated
+        _batchSummary.value = PromptBatchTrainingEngine.summarize(updated)
+    }
+
+    fun deleteDirective(id: String) {
+        val updated = _parsedDirectives.value.filterNot { it.id == id }
+        _parsedDirectives.value = updated
+        _batchSummary.value = PromptBatchTrainingEngine.summarize(updated)
+    }
+
+    fun addCustomDirective(directive: ParsedBatchDirective) {
+        val updated = _parsedDirectives.value + directive
+        _parsedDirectives.value = updated
+        _batchSummary.value = PromptBatchTrainingEngine.summarize(updated)
+    }
+
+    fun applyBatchToJarvis() {
+        viewModelScope.launch {
+            _isApplying.value = true
+            _syncMessage.value = "Applying training batch and live-syncing to JARVIS..."
+            val result = repository.applyBatch(
+                directives = _parsedDirectives.value,
+                batchDescription = "Prompt Batch Training"
+            )
+            _isApplying.value = false
+            _batchApplyResult.value = result
+            _syncMessage.value = "Batch Training applied! v${result.version} (Rules: ${result.rulesCount}, Examples: ${result.examplesCount})"
+        }
+    }
+
+    fun dismissApplyResult() {
+        _batchApplyResult.value = null
+        _isReviewMode.value = false
+    }
+
+    // --- END BATCH METHODS ---
 
     fun setSearchQuery(query: String) {
         _searchQuery.value = query

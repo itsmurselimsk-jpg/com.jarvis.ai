@@ -123,6 +123,12 @@ class ContinuousWakeEngine(
             return
         }
 
+        // Live Voice Conversation has exclusive microphone ownership
+        if (LiveVoiceSessionManager.isLiveSessionActive.value) {
+            _isMicrophoneActive.value = false
+            return
+        }
+
         cancelRestart()
 
         try {
@@ -250,12 +256,12 @@ class ContinuousWakeEngine(
     }
 
     private fun scheduleRestart(delayMs: Long) {
-        if (isDestroyed || _engineState.value == EngineState.STOPPED || _engineState.value == EngineState.SPEAKING_OR_PROCESSING) {
+        if (isDestroyed || _engineState.value == EngineState.STOPPED || _engineState.value == EngineState.SPEAKING_OR_PROCESSING || LiveVoiceSessionManager.isLiveSessionActive.value) {
             return
         }
         cancelRestart()
         restartRunnable = Runnable {
-            if (!isDestroyed && _engineState.value != EngineState.STOPPED && _engineState.value != EngineState.SPEAKING_OR_PROCESSING) {
+            if (!isDestroyed && _engineState.value != EngineState.STOPPED && _engineState.value != EngineState.SPEAKING_OR_PROCESSING && !LiveVoiceSessionManager.isLiveSessionActive.value) {
                 recreateRecognizer()
                 startListeningInternal()
             }

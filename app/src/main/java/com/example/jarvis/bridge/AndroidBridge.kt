@@ -36,18 +36,19 @@ import android.provider.Settings
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
-import android.speech.tts.TextToSpeech
-import android.speech.tts.UtteranceProgressListener
-import android.speech.tts.Voice
 import android.view.KeyEvent
 import androidx.core.content.ContextCompat
 import com.example.jarvis.model.DeviceTelemetry
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
+import java.util.Date
 
 class AndroidBridge(private val context: Context) {
 
@@ -85,13 +86,11 @@ class AndroidBridge(private val context: Context) {
     private var audioFocusRequest: AudioFocusRequest? = null
 
     private var speechRecognizer: SpeechRecognizer? = null
-    private var textToSpeech: TextToSpeech? = null
-    private var isTtsReady = false
 
     private var sensorManager: SensorManager? = null
     private var accelListener: SensorEventListener? = null
 
-    fun isTtsInitialized(): Boolean = isTtsReady
+    fun isTtsInitialized(): Boolean = true
     fun getApplicationContext(): Context = context
 
     private var onSpeechResultCallback: ((String) -> Unit)? = null
@@ -105,45 +104,50 @@ class AndroidBridge(private val context: Context) {
 
     init {
         com.example.jarvis.memory.KnowledgeGraphEngine.initialize(context)
-        initTts()
         initSpeechRecognizer()
         initTorchMonitoring()
         initSensorMonitoring()
         refreshTelemetry()
-    }
 
-    private fun initTts() {
-        textToSpeech = TextToSpeech(context) { status ->
-            if (status == TextToSpeech.SUCCESS) {
-                var langRes = textToSpeech?.setLanguage(Locale.UK)
-                if (langRes == TextToSpeech.LANG_MISSING_DATA || langRes == TextToSpeech.LANG_NOT_SUPPORTED) {
-                    langRes = textToSpeech?.setLanguage(Locale.US)
-                    if (langRes == TextToSpeech.LANG_MISSING_DATA || langRes == TextToSpeech.LANG_NOT_SUPPORTED) {
-                        textToSpeech?.setLanguage(Locale.getDefault())
-                    }
+        // Sync speaking state from JarvisVoiceEngine
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+            com.example.jarvis.voice.JarvisVoiceEngine.isSpeaking.collect { speaking ->
+                _isSpeaking.value = speaking
+            }
+        }
+
+        // Forward barge-in interrupts
+        com.example.jarvis.voice.JarvisVoiceEngine.onBargeInTriggered = {
+            mainHandler.post {
+                onBargeInTriggered?.invoke()
+            }
+        }
+
+        // Sync Live Voice Session state
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+            com.example.jarvis.voice.LiveVoiceSessionManager.isListening.collect { listening ->
+                if (com.example.jarvis.voice.LiveVoiceSessionManager.isLiveSessionActive.value) {
+                    _isListening.value = listening
                 }
-                isTtsReady = true
-                try {
-                    selectBestNeuralVoice(Locale.UK, preferMale = true)
-                } catch (_: Exception) {}
-
-                textToSpeech?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                    override fun onStart(utteranceId: String?) {
-                        _isSpeaking.value = true
-                    }
-                    override fun onDone(utteranceId: String?) {
-                        _isSpeaking.value = false
-                        echoDetector.notifyTtsFinished()
-                        bargeInDetector?.stopMonitoring()
-                        onUtteranceDoneCallback?.invoke(utteranceId)
-                    }
-                    override fun onError(utteranceId: String?) {
-                        _isSpeaking.value = false
-                        echoDetector.notifyTtsFinished()
-                        bargeInDetector?.stopMonitoring()
-                        onUtteranceDoneCallback?.invoke(utteranceId)
-                    }
-                })
+            }
+        }
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+            com.example.jarvis.voice.LiveVoiceSessionManager.voiceRmsDb.collect { rms ->
+                if (com.example.jarvis.voice.LiveVoiceSessionManager.isLiveSessionActive.value) {
+                    _voiceRmsDb.value = rms
+                }
+            }
+        }
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+            com.example.jarvis.voice.LiveVoiceSessionManager.liveTranscript.collect { t ->
+                if (com.example.jarvis.voice.LiveVoiceSessionManager.isLiveSessionActive.value) {
+                    _liveTranscript.value = t
+                }
+            }
+        }
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+            com.example.jarvis.voice.LiveVoiceSessionManager.isMicMuted.collect { muted ->
+                _isMicMuted.value = muted
             }
         }
     }
@@ -276,6 +280,12 @@ class AndroidBridge(private val context: Context) {
     }
 
     fun startListening(onResult: (String) -> Unit, onError: ((Int) -> Unit)?) {
+        if (com.example.jarvis.voice.LiveVoiceSessionManager.isLiveSessionActive.value) {
+            com.example.jarvis.voice.LiveVoiceSessionManager.onUserSpeechFinalized = onResult
+            com.example.jarvis.voice.LiveVoiceSessionManager.startSession(context)
+            return
+        }
+
         if (_isMicMuted.value) {
             _isListening.value = false
             return
@@ -315,6 +325,9 @@ class AndroidBridge(private val context: Context) {
     }
 
     fun stopListening() {
+        if (com.example.jarvis.voice.LiveVoiceSessionManager.isLiveSessionActive.value) {
+            com.example.jarvis.voice.LiveVoiceSessionManager.endSession()
+        }
         mainHandler.post {
             try {
                 speechRecognizer?.stopListening()
@@ -389,24 +402,19 @@ class AndroidBridge(private val context: Context) {
             return
         }
 
-        val settings = repository?.settings?.value
-        val profile = com.example.jarvis.voice.VoiceProfileType.fromName(settings?.voiceProfileName ?: "JARVIS Bettany")
-
-        com.example.jarvis.voice.HumanVoiceEngine.speak(
+        echoDetector.notifyTtsStarted(text)
+        com.example.jarvis.voice.JarvisVoiceEngine.speak(
             context = context,
             text = text,
-            speechRate = speechRate,
-            pitch = pitch,
-            locale = locale,
-            voiceProfile = profile,
-            settings = settings,
-            bridge = this,
-            onDone = onDone
+            onDone = {
+                echoDetector.notifyTtsFinished()
+                onDone?.invoke()
+            }
         )
     }
 
     /**
-     * Speaks using local calibrated on-device Neural WaveNet TTS.
+     * Legacy/Fallback speak invocation routed centrally through JarvisVoiceEngine.
      */
     fun speakDeviceNeural(
         sanitizedText: String,
@@ -416,131 +424,20 @@ class AndroidBridge(private val context: Context) {
         voiceProfile: com.example.jarvis.voice.VoiceProfileType? = null,
         onDone: (() -> Unit)? = null
     ) {
-        if (sanitizedText.isBlank() || !_isSpeakerEnabled.value) {
-            onDone?.invoke()
-            return
-        }
-
-        // If custom audio recording for "Ami Jarvis bolchi" is present, play it directly
-        val isBengaliIntro = sanitizedText.contains("আমি জার্ভিস বলছি") || sanitizedText.contains("Ami Jarvis bolchi")
-        if (isBengaliIntro) {
-            val playedCustom = com.example.jarvis.voice.HumanVoiceEngine.playCustomRecordedClip(context, this) {
-                _isSpeaking.value = false
-                onDone?.invoke()
-            }
-            if (playedCustom) {
-                return
-            }
-        }
-
-        if (textToSpeech == null || !isTtsReady) {
-            initTts()
-            mainHandler.postDelayed({
-                speakDeviceNeural(sanitizedText, speechRate, pitch, locale, voiceProfile, onDone)
-            }, 350)
-            return
-        }
-
-        requestAudioFocus()
-        val targetLocale = locale ?: when {
-            sanitizedText.any { it in '\u0980'..'\u09FF' } -> Locale("bn", "IN")
-            sanitizedText.any { it in '\u0900'..'\u097F' } -> Locale("hi", "IN")
-            else -> voiceProfile?.preferredLocaleTag?.let { Locale.forLanguageTag(it) } ?: Locale.UK
-        }
-        try {
-            var langRes = textToSpeech?.setLanguage(targetLocale)
-            if (langRes == TextToSpeech.LANG_MISSING_DATA || langRes == TextToSpeech.LANG_NOT_SUPPORTED) {
-                langRes = textToSpeech?.setLanguage(Locale.US)
-                if (langRes == TextToSpeech.LANG_MISSING_DATA || langRes == TextToSpeech.LANG_NOT_SUPPORTED) {
-                    textToSpeech?.setLanguage(Locale.getDefault())
-                }
-            }
-            selectBestNeuralVoice(targetLocale, preferMale = voiceProfile != com.example.jarvis.voice.VoiceProfileType.FRIDAY)
-        } catch (_: Exception) {}
-
-        textToSpeech?.setSpeechRate(speechRate.coerceIn(0.5f, 2.0f))
-        textToSpeech?.setPitch(pitch.coerceIn(0.5f, 2.0f))
-        val utteranceId = "JARVIS_${System.currentTimeMillis()}"
-        if (onDone != null) {
-            val previousDone = onUtteranceDoneCallback
-            onUtteranceDoneCallback = { id ->
-                previousDone?.invoke(id)
-                if (id == utteranceId) {
-                    abandonAudioFocus()
-                    bargeInDetector?.stopMonitoring()
-                    onDone()
-                }
-            }
-        }
-        _isSpeaking.value = true
-        echoDetector.notifyTtsStarted(sanitizedText)
-
-        // Real-time acoustic barge-in detector: monitors microphone for user interruption during TTS
-        startBargeInMonitoring()
-
-        val params = Bundle()
-        params.putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId)
-        val result = textToSpeech?.speak(sanitizedText, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
-        if (result != TextToSpeech.SUCCESS) {
-            _isSpeaking.value = false
-            echoDetector.notifyTtsFinished()
-            bargeInDetector?.stopMonitoring()
-            abandonAudioFocus()
-            onDone?.invoke()
-        }
-    }
-
-    /**
-     * Selects the highest quality Neural / Network / WaveNet voice available on device.
-     */
-    fun selectBestNeuralVoice(targetLocale: Locale, preferMale: Boolean = true): Boolean {
-        val tts = textToSpeech ?: return false
-        return try {
-            val availableVoices = tts.voices ?: return false
-            val matchingVoices = availableVoices.filter { voice ->
-                voice.locale.language.equals(targetLocale.language, ignoreCase = true)
-            }
-            if (matchingVoices.isEmpty()) return false
-
-            val bestVoice = matchingVoices.maxByOrNull { voice ->
-                var score = 0
-                val name = voice.name.lowercase()
-                if (name.contains("network")) score += 50
-                if (name.contains("neural") || name.contains("wavenet")) score += 40
-                if (name.contains("natural")) score += 30
-                if (voice.quality >= 400) score += 20
-                if (preferMale && (name.contains("male") || name.contains("rjs") || name.contains("g-network") || name.contains("en-gb-x-rjs"))) score += 20
-                if (!preferMale && (name.contains("female") || name.contains("sfg") || name.contains("woman"))) score += 20
-                score
-            }
-
-            if (bestVoice != null) {
-                tts.voice = bestVoice
-                true
-            } else false
-        } catch (_: Exception) {
-            false
-        }
-    }
-
-    fun getInstalledTtsVoices(): List<String> {
-        return try {
-            textToSpeech?.voices?.map { "${it.name} (${it.locale.displayLanguage})" }?.take(15) ?: emptyList()
-        } catch (_: Exception) {
-            emptyList()
-        }
+        speak(sanitizedText, speechRate, pitch, locale, onDone)
     }
 
     fun stopDeviceTts() {
-        textToSpeech?.stop()
+        com.example.jarvis.voice.JarvisVoiceEngine.stop()
         abandonAudioFocus()
         _isSpeaking.value = false
     }
 
     fun stopSpeaking() {
         bargeInDetector?.stopMonitoring()
-        com.example.jarvis.voice.HumanVoiceEngine.stop(this)
-        stopDeviceTts()
+        com.example.jarvis.voice.JarvisVoiceEngine.stop()
+        abandonAudioFocus()
+        _isSpeaking.value = false
     }
 
     // FLASH LIGHT CONTROLLER & VERIFIER
@@ -1365,8 +1262,7 @@ class AndroidBridge(private val context: Context) {
     fun destroy() {
         try {
             speechRecognizer?.destroy()
-            textToSpeech?.stop()
-            textToSpeech?.shutdown()
+            com.example.jarvis.voice.JarvisVoiceEngine.release()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && torchCallback != null) {
                 val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as? CameraManager
                 cameraManager?.unregisterTorchCallback(torchCallback!!)

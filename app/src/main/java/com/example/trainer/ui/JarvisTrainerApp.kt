@@ -45,6 +45,15 @@ fun JarvisTrainerApp(
     val filteredItems by viewModel.filteredItems.collectAsState()
     val history by viewModel.history.collectAsState()
 
+    // Batch Prompt State
+    val batchPromptText by viewModel.batchPromptText.collectAsState()
+    val isAnalyzingPrompt by viewModel.isAnalyzingPrompt.collectAsState()
+    val isReviewMode by viewModel.isReviewMode.collectAsState()
+    val parsedDirectives by viewModel.parsedDirectives.collectAsState()
+    val batchSummary by viewModel.batchSummary.collectAsState()
+    val batchApplyResult by viewModel.batchApplyResult.collectAsState()
+    val reviewCategoryFilter by viewModel.reviewCategoryFilter.collectAsState()
+
     var showAddEditDialog by remember { mutableStateOf(false) }
     var itemToEdit by remember { mutableStateOf<TrainingItem?>(null) }
 
@@ -101,6 +110,29 @@ fun JarvisTrainerApp(
 
                 // Tab Content
                 when (selectedTab) {
+                    TrainerTab.BATCH_PROMPT -> {
+                        BatchPromptTab(
+                            promptText = batchPromptText,
+                            isAnalyzing = isAnalyzingPrompt,
+                            isReviewMode = isReviewMode,
+                            directives = parsedDirectives,
+                            summary = batchSummary,
+                            applyResult = batchApplyResult,
+                            categoryFilter = reviewCategoryFilter,
+                            onPromptChange = { viewModel.setBatchPromptText(it) },
+                            onLoadTemplate = { viewModel.loadBatchTemplate(it) },
+                            onAnalyzePrompt = { viewModel.analyzeBatchPrompt() },
+                            onExitReview = { viewModel.exitReviewMode() },
+                            onCategoryFilterChange = { viewModel.setReviewCategoryFilter(it) },
+                            onToggleApproval = { viewModel.toggleDirectiveApproval(it) },
+                            onUpdateDirective = { viewModel.updateDirective(it) },
+                            onDeleteDirective = { viewModel.deleteDirective(it) },
+                            onApplyBatch = { viewModel.applyBatchToJarvis() },
+                            onDismissApplyResult = { viewModel.dismissApplyResult() },
+                            onViewHistory = { viewModel.setTab(TrainerTab.HISTORY) }
+                        )
+                    }
+
                     TrainerTab.BEHAVIORS -> {
                         BehaviorsTab(
                             items = filteredItems,

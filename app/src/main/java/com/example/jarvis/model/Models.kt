@@ -117,28 +117,22 @@ enum class VoiceSynthesisEngine(
     val subtitle: String,
     val description: String
 ) {
+    ELEVENLABS(
+        id = "elevenlabs",
+        title = "ElevenLabs Cloned Voice (Authoritative)",
+        subtitle = "Voice ID: dIttBl4oQhi4hifzkuq5",
+        description = "Official ElevenLabs neural voice cloning synthesis with natural breathing, calm intelligence, and conversational prosody."
+    ),
     HYBRID_AUTO(
         id = "hybrid_auto",
-        title = "Hybrid Smart (Recommended)",
-        subtitle = "Cloud Studio + Offline Fallback",
-        description = "Streams Gemini Studio ultra-realistic human speech when online, and instantly falls back to On-Device Neural WaveNet voice when offline."
-    ),
-    GEMINI_STUDIO(
-        id = "gemini_studio",
-        title = "Gemini Studio Human",
-        subtitle = "Ultra-Realistic Expressive Voice",
-        description = "Studio-grade neural human acoustics featuring natural breath pauses, emotional inflections, and cinematic prosody."
-    ),
-    NEURAL_DEVICE(
-        id = "neural_device",
-        title = "On-Device Neural",
-        subtitle = "Zero Latency & 100% Offline",
-        description = "Calibrated Google TTS Neural WaveNet engine with human conversational cadences."
+        title = "ElevenLabs Cloned Voice",
+        subtitle = "Voice ID: dIttBl4oQhi4hifzkuq5",
+        description = "Official ElevenLabs neural voice cloning synthesis."
     );
 
     companion object {
         fun fromId(id: String): VoiceSynthesisEngine =
-            entries.find { it.id.equals(id, ignoreCase = true) } ?: HYBRID_AUTO
+            entries.find { it.id.equals(id, ignoreCase = true) } ?: ELEVENLABS
     }
 }
 
@@ -157,7 +151,7 @@ data class ProviderSettings(
     val continuousWakeEnabled: Boolean = true,
     val continuousConversationEnabled: Boolean = true,
     val lockScreenWakeEnabled: Boolean = true,
-    val voiceSynthesisEngine: VoiceSynthesisEngine = VoiceSynthesisEngine.HYBRID_AUTO,
+    val voiceSynthesisEngine: VoiceSynthesisEngine = VoiceSynthesisEngine.ELEVENLABS,
     val geminiVoiceName: String = "Puck"
 )
 

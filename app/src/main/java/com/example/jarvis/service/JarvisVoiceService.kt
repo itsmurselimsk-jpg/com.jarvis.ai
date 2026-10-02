@@ -98,6 +98,17 @@ class JarvisVoiceService : Service() {
         createNotificationChannel()
         initWakeEngine()
 
+        // Coordinate with Live Voice Session to prevent duplicate SpeechRecognizer
+        serviceScope.launch {
+            com.example.jarvis.voice.LiveVoiceSessionManager.isLiveSessionActive.collect { active ->
+                if (active) {
+                    wakeEngine?.pauseForSpeaking()
+                } else if (_isServiceRunning.value) {
+                    wakeEngine?.resumeAfterSpeaking(false)
+                }
+            }
+        }
+
         // Smart Battery & Power Alerts
         smartBatteryMonitor = SmartBatteryMonitor(
             context = applicationContext,

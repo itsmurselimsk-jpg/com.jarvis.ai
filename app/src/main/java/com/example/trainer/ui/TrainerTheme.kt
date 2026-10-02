@@ -17,6 +17,9 @@ val TrainerAmber = Color(0xFFFFD600)
 val TrainerRed = Color(0xFFFF5252)
 val TrainerTextPrimary = Color(0xFFE2E8F0)
 val TrainerTextSecondary = Color(0xFF94A3B8)
+val TrainerTextDim = Color(0xFF64748B)
+val TrainerBorder = Color(0xFF00E5FF).copy(alpha = 0.25f)
+val TrainerBorderSubtle = Color(0xFF1E293B)
 
 private val TrainerDarkColorScheme = darkColorScheme(
     primary = TrainerCyan,

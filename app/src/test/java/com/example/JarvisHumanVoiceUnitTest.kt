@@ -2,28 +2,69 @@ package com.example
 
 import com.example.jarvis.model.ProviderSettings
 import com.example.jarvis.model.VoiceSynthesisEngine
+import com.example.jarvis.voice.JarvisVoiceConfig
 import com.example.jarvis.voice.SupportedLanguage
 import com.example.jarvis.voice.TtsSanitizer
+import com.example.jarvis.voice.VoiceError
 import com.example.jarvis.voice.VoiceProfileType
+import com.example.jarvis.voice.VoiceProviderType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class JarvisHumanVoiceUnitTest {
 
     @Test
     fun testVoiceSynthesisEngineResolution() {
+        assertEquals(VoiceSynthesisEngine.ELEVENLABS, VoiceSynthesisEngine.fromId("elevenlabs"))
         assertEquals(VoiceSynthesisEngine.HYBRID_AUTO, VoiceSynthesisEngine.fromId("hybrid_auto"))
-        assertEquals(VoiceSynthesisEngine.GEMINI_STUDIO, VoiceSynthesisEngine.fromId("gemini_studio"))
-        assertEquals(VoiceSynthesisEngine.NEURAL_DEVICE, VoiceSynthesisEngine.fromId("neural_device"))
-        assertEquals(VoiceSynthesisEngine.HYBRID_AUTO, VoiceSynthesisEngine.fromId("unknown_engine"))
+        assertEquals(VoiceSynthesisEngine.ELEVENLABS, VoiceSynthesisEngine.fromId("unknown_engine"))
 
         // Verify descriptive metadata exists
-        assertTrue(VoiceSynthesisEngine.HYBRID_AUTO.title.contains("Hybrid"))
-        assertTrue(VoiceSynthesisEngine.GEMINI_STUDIO.description.contains("human"))
-        assertTrue(VoiceSynthesisEngine.NEURAL_DEVICE.subtitle.contains("Offline"))
+        assertTrue(VoiceSynthesisEngine.ELEVENLABS.title.contains("ElevenLabs"))
+        assertTrue(VoiceSynthesisEngine.ELEVENLABS.subtitle.contains(JarvisVoiceConfig.DEFAULT_VOICE_ID))
+    }
+
+    @Test
+    fun testJarvisVoiceConfigDefaults() {
+        val config = JarvisVoiceConfig()
+        assertEquals(VoiceProviderType.ELEVENLABS, config.provider)
+        assertEquals("dIttBl4oQhi4hifzkuq5", config.voiceId)
+        assertEquals("eleven_multilingual_v2", config.model)
+        assertEquals(0.50f, config.stability, 0.01f)
+        assertEquals(0.75f, config.similarity, 0.01f)
+        assertEquals(0.0f, config.style, 0.01f)
+        assertTrue(config.speakerBoost)
+        assertTrue(config.enabled)
+
+        // Test JSON round-trip
+        val json = config.toJson()
+        val restored = JarvisVoiceConfig.fromJson(json)
+        assertEquals(config.voiceId, restored.voiceId)
+        assertEquals(config.model, restored.model)
+        assertEquals(config.stability, restored.stability, 0.01f)
+    }
+
+    @Test
+    fun testVoiceErrorStates() {
+        val authErr = VoiceError.AuthenticationError()
+        assertTrue(authErr.userMessage.contains("Voice authentication issue"))
+        assertTrue(authErr.technicalDetail.contains("API key"))
+
+        val invalidIdErr = VoiceError.InvalidVoiceIdError("dIttBl4oQhi4hifzkuq5")
+        assertTrue(invalidIdErr.technicalDetail.contains("dIttBl4oQhi4hifzkuq5"))
+        assertTrue(invalidIdErr.userMessage.contains("Response displayed in text"))
+
+        val netErr = VoiceError.NetworkError()
+        assertTrue(netErr.userMessage.contains("network"))
+
+        val rateErr = VoiceError.RateLimitError()
+        assertTrue(rateErr.userMessage.contains("rate limit"))
     }
 
     @Test
@@ -77,7 +118,7 @@ class JarvisHumanVoiceUnitTest {
     @Test
     fun testProviderSettingsDefaultAudioEngine() {
         val settings = ProviderSettings()
-        assertEquals(VoiceSynthesisEngine.HYBRID_AUTO, settings.voiceSynthesisEngine)
+        assertEquals(VoiceSynthesisEngine.ELEVENLABS, settings.voiceSynthesisEngine)
         assertEquals("Puck", settings.geminiVoiceName)
         assertEquals("JARVIS Natural", settings.voiceProfileName)
     }

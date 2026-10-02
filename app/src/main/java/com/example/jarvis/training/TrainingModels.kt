@@ -275,6 +275,7 @@ data class TrainingBundle(
     val items: List<TrainingItem> = emptyList(),
     val conversationTrainings: List<ConversationTraining> = emptyList(),
     val rules: List<BehaviorRule> = emptyList(),
+    val voiceConfig: com.example.jarvis.voice.JarvisVoiceConfig = com.example.jarvis.voice.JarvisVoiceConfig(),
     val appliedBy: String = "JARVIS Trainer"
 ) {
     fun toJsonString(): String {
@@ -282,6 +283,7 @@ data class TrainingBundle(
         root.put("trainingVersion", version)
         root.put("timestamp", timestamp)
         root.put("appliedBy", appliedBy)
+        root.put("voiceConfig", voiceConfig.toJson())
 
         val itemsArr = JSONArray()
         items.forEach { itemsArr.put(it.toJson()) }
@@ -304,6 +306,12 @@ data class TrainingBundle(
             val version = root.optInt("trainingVersion", root.optInt("version", 1))
             val timestamp = root.optLong("timestamp", System.currentTimeMillis())
             val appliedBy = root.optString("appliedBy", "JARVIS Trainer")
+
+            val voiceConfig = if (root.has("voiceConfig")) {
+                com.example.jarvis.voice.JarvisVoiceConfig.fromJson(root.getJSONObject("voiceConfig"))
+            } else {
+                com.example.jarvis.voice.JarvisVoiceConfig()
+            }
 
             val items = mutableListOf<TrainingItem>()
             val itemsArr = root.optJSONArray("items")
@@ -335,8 +343,103 @@ data class TrainingBundle(
                 items = items,
                 conversationTrainings = convs,
                 rules = rules,
+                voiceConfig = voiceConfig,
                 appliedBy = appliedBy
             )
         }
     }
 }
+
+enum class BatchTrainingItemType(val displayName: String) {
+    BEHAVIOR("Behavior Instruction"),
+    PERSONALITY("Personality Instruction"),
+    LANGUAGE("Language Rule"),
+    SAFETY("Safety Policy"),
+    TOOL_ACTION("Tool & Action"),
+    RESPONSE_EXAMPLE("Response Example")
+}
+
+data class ParsedBatchDirective(
+    val id: String = UUID.randomUUID().toString(),
+    val rawInstruction: String,
+    val type: BatchTrainingItemType = BatchTrainingItemType.BEHAVIOR,
+    val category: String = TrainingCategories.CASUAL_CONVERSATION,
+    val title: String = "",
+    val ruleText: String = "",
+    val userInputExample: String? = null,
+    val goodResponseExample: String? = null,
+    val badResponseExample: String? = null,
+    val requiresConfirmation: Boolean = false,
+    val toolRequired: String? = null,
+    val tone: TrainingTone = TrainingTone.FRIENDLY,
+    val priority: Int = 2,
+    val isApproved: Boolean = true
+) {
+    fun toBehaviorRule(version: Int = 1): BehaviorRule {
+        return BehaviorRule(
+            id = id,
+            rule = ruleText.ifBlank { rawInstruction },
+            category = category,
+            priority = priority,
+            enabled = true,
+            version = version
+        )
+    }
+
+    fun toTrainingItem(version: Int = 1): TrainingItem? {
+        val input = userInputExample ?: if (toolRequired != null) "Check $toolRequired" else ""
+        if (input.isBlank() && goodResponseExample.isNullOrBlank() && toolRequired == null) {
+            return null
+        }
+        return TrainingItem(
+            id = id,
+            type = when (type) {
+                BatchTrainingItemType.TOOL_ACTION -> TrainingType.TOOL
+                BatchTrainingItemType.SAFETY -> TrainingType.CONFIRMATION
+                BatchTrainingItemType.PERSONALITY -> TrainingType.PERSONALITY
+                else -> TrainingType.BEHAVIOR
+            },
+            category = category,
+            intent = when (type) {
+                BatchTrainingItemType.TOOL_ACTION -> "DEVICE_ACTION"
+                BatchTrainingItemType.SAFETY -> "CONFIRMATION_CHECK"
+                BatchTrainingItemType.LANGUAGE -> "LANGUAGE_SWITCH"
+                else -> "BEHAVIORAL_DIRECTIVE"
+            },
+            userInput = input,
+            goodResponses = if (!goodResponseExample.isNullOrBlank()) listOf(goodResponseExample) else emptyList(),
+            badResponses = if (!badResponseExample.isNullOrBlank()) listOf(badResponseExample) else emptyList(),
+            behaviorRules = listOf(ruleText.ifBlank { rawInstruction }),
+            language = if (type == BatchTrainingItemType.LANGUAGE) category.lowercase() else "auto",
+            tone = tone,
+            toolRequired = toolRequired,
+            confirmationRequired = requiresConfirmation,
+            priority = priority,
+            enabled = true,
+            version = version
+        )
+    }
+}
+
+data class BatchAnalysisSummary(
+    val totalDirectives: Int = 0,
+    val rulesCount: Int = 0,
+    val examplesCount: Int = 0,
+    val personalityCount: Int = 0,
+    val languageCount: Int = 0,
+    val safetyCount: Int = 0,
+    val toolCount: Int = 0
+)
+
+data class BatchApplyResult(
+    val rulesCount: Int,
+    val examplesCount: Int,
+    val personalityCount: Int,
+    val languageCount: Int,
+    val safetyCount: Int,
+    val toolCount: Int,
+    val isSynced: Boolean,
+    val version: Int,
+    val message: String
+)
+

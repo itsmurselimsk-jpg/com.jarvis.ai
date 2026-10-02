@@ -241,6 +241,118 @@ class TrainerRepository(private val context: Context) {
     }
 
     /**
+     * BATCH APPLY:
+     * Applies all approved batch directives in one atomic operation.
+     * Prevents duplicate rules, preserves existing training, records history, and delivers live sync.
+     */
+    fun applyBatch(
+        directives: List<ParsedBatchDirective>,
+        batchDescription: String = "Prompt Batch Training"
+    ): BatchApplyResult {
+        val approved = directives.filter { it.isApproved }
+        val cur = _currentBundle.value
+
+        val existingRules = cur.rules
+        val existingItems = cur.items
+
+        var rulesCount = 0
+        var examplesCount = 0
+        var personalityCount = 0
+        var languageCount = 0
+        var safetyCount = 0
+        var toolCount = 0
+
+        val newRulesToAdd = mutableListOf<BehaviorRule>()
+        val newItemsToAdd = mutableListOf<TrainingItem>()
+
+        val ackVer = try { TrainingEngine.getAcknowledgedVersion() } catch (e: Exception) { 1 }
+        val targetVersion = maxOf(cur.version, ackVer) + 1
+
+        for (directive in approved) {
+            when (directive.type) {
+                BatchTrainingItemType.PERSONALITY -> personalityCount++
+                BatchTrainingItemType.LANGUAGE -> languageCount++
+                BatchTrainingItemType.SAFETY -> safetyCount++
+                BatchTrainingItemType.TOOL_ACTION -> toolCount++
+                BatchTrainingItemType.RESPONSE_EXAMPLE -> examplesCount++
+                BatchTrainingItemType.BEHAVIOR -> {}
+            }
+
+            // 1. Behavior Rule creation (check duplicates)
+            val ruleText = directive.ruleText.ifBlank { directive.rawInstruction }
+            if (directive.type != BatchTrainingItemType.RESPONSE_EXAMPLE &&
+                !PromptBatchTrainingEngine.isDuplicateRule(existingRules + newRulesToAdd, ruleText)
+            ) {
+                newRulesToAdd.add(directive.toBehaviorRule(targetVersion))
+                rulesCount++
+            }
+
+            // 2. Training Item creation (for triggers, tools, examples, confirmation)
+            val trainingItem = directive.toTrainingItem(targetVersion)
+            if (trainingItem != null) {
+                val isDup = PromptBatchTrainingEngine.isDuplicateItem(existingItems + newItemsToAdd, trainingItem.userInput)
+                if (!isDup) {
+                    newItemsToAdd.add(trainingItem)
+                    if (directive.type != BatchTrainingItemType.RESPONSE_EXAMPLE) {
+                        examplesCount++
+                    }
+                }
+            }
+        }
+
+        pushUndo()
+
+        val updatedBundle = cur.copy(
+            version = targetVersion,
+            timestamp = System.currentTimeMillis(),
+            rules = cur.rules + newRulesToAdd,
+            items = cur.items + newItemsToAdd,
+            appliedBy = "Prompt Batch Training"
+        )
+
+        _currentBundle.value = updatedBundle
+        saveToStorage(updatedBundle)
+
+        // Record history entry
+        val historyDesc = "$batchDescription: +${newRulesToAdd.size} rules, +${newItemsToAdd.size} items"
+        val entry = VersionHistoryEntry(
+            version = targetVersion,
+            timestamp = System.currentTimeMillis(),
+            itemsCount = updatedBundle.items.size,
+            rulesCount = updatedBundle.rules.size,
+            description = historyDesc,
+            bundleJson = updatedBundle.toJsonString()
+        )
+        val newHistory = (listOf(entry) + _history.value).take(50)
+        _history.value = newHistory
+        saveHistory(newHistory)
+
+        // Live-sync to Main JARVIS App immediately
+        val syncResult = ipcClient.saveAndApply(updatedBundle)
+        val isSynced = syncResult.state == SyncState.SYNCED || isDirectlySyncedInSameProcess(updatedBundle)
+
+        return BatchApplyResult(
+            rulesCount = newRulesToAdd.size,
+            examplesCount = newItemsToAdd.size,
+            personalityCount = personalityCount,
+            languageCount = languageCount,
+            safetyCount = safetyCount,
+            toolCount = toolCount,
+            isSynced = isSynced,
+            version = targetVersion,
+            message = syncResult.message
+        )
+    }
+
+    private fun isDirectlySyncedInSameProcess(bundle: TrainingBundle): Boolean {
+        return try {
+            TrainingEngine.activeBundle.value.version >= bundle.version
+        } catch (_: Exception) {
+            true
+        }
+    }
+
+    /**
      * SAVE & APPLY:
      * Increments version, records history, persists, and delivers live sync via IPC!
      */

@@ -611,17 +611,20 @@ class AgentBrain(
         val shouldSpeak = isLiveVoiceSessionActive || settings.autoSpeakResponses
         if (shouldSpeak) {
             onSpeaking()
+            com.example.jarvis.voice.LiveVoiceSessionManager.notifyJarvisStartedSpeaking(text)
             bridge.speak(
                 text = text,
                 speechRate = settings.speechRate,
                 pitch = settings.speechPitch,
                 onDone = {
                     onIdle()
+                    com.example.jarvis.voice.LiveVoiceSessionManager.notifyJarvisFinishedSpeaking()
                     onSpeechCompletedCallback?.invoke()
                 }
             )
         } else {
             onIdle()
+            com.example.jarvis.voice.LiveVoiceSessionManager.notifyJarvisFinishedSpeaking()
             onSpeechCompletedCallback?.invoke()
         }
     }
