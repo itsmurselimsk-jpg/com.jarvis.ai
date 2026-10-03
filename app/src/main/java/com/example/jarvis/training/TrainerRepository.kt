@@ -2,6 +2,7 @@ package com.example.jarvis.training
 
 import android.content.Context
 import android.util.Log
+import java.util.Locale
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -290,8 +291,11 @@ class TrainerRepository(private val context: Context) {
             // 2. Training Item creation (for triggers, tools, examples, confirmation)
             val trainingItem = directive.toTrainingItem(targetVersion)
             if (trainingItem != null) {
-                val isDup = PromptBatchTrainingEngine.isDuplicateItem(existingItems + newItemsToAdd, trainingItem.userInput)
-                if (!isDup) {
+                val existingMatch = newItemsToAdd.firstOrNull { it.userInput.equals(trainingItem.userInput, ignoreCase = true) }
+                if (existingMatch != null) {
+                    newItemsToAdd.remove(existingMatch)
+                    newItemsToAdd.add(trainingItem)
+                } else {
                     newItemsToAdd.add(trainingItem)
                     if (directive.type != BatchTrainingItemType.RESPONSE_EXAMPLE) {
                         examplesCount++
@@ -302,11 +306,15 @@ class TrainerRepository(private val context: Context) {
 
         pushUndo()
 
+        // Overwrite existing baseline items that match newly trained inputs
+        val newTriggers = newItemsToAdd.map { it.userInput.trim().lowercase(Locale.ROOT) }.toSet()
+        val mergedItems = cur.items.filterNot { newTriggers.contains(it.userInput.trim().lowercase(Locale.ROOT)) } + newItemsToAdd
+
         val updatedBundle = cur.copy(
             version = targetVersion,
             timestamp = System.currentTimeMillis(),
             rules = cur.rules + newRulesToAdd,
-            items = cur.items + newItemsToAdd,
+            items = mergedItems,
             appliedBy = "Prompt Batch Training"
         )
 
@@ -328,6 +336,13 @@ class TrainerRepository(private val context: Context) {
         saveHistory(newHistory)
 
         // Live-sync to Main JARVIS App immediately
+        try {
+            TrainingEngine.initialize(context)
+            TrainingEngine.applyNewTrainingBundle(updatedBundle, persist = true)
+        } catch (e: Exception) {
+            Log.w(TAG, "Direct in-process training apply failed: ${e.message}")
+        }
+
         val syncResult = ipcClient.saveAndApply(updatedBundle)
         val isSynced = syncResult.state == SyncState.SYNCED || isDirectlySyncedInSameProcess(updatedBundle)
 
@@ -381,7 +396,14 @@ class TrainerRepository(private val context: Context) {
         _history.value = newHistory
         saveHistory(newHistory)
 
-        // Deliver live sync to JARVIS!
+        // Deliver directly in process and via live sync
+        try {
+            TrainingEngine.initialize(context)
+            TrainingEngine.applyNewTrainingBundle(updatedBundle, persist = true)
+        } catch (e: Exception) {
+            Log.w(TAG, "Direct in-process training apply failed: ${e.message}")
+        }
+
         return ipcClient.saveAndApply(updatedBundle)
     }
 

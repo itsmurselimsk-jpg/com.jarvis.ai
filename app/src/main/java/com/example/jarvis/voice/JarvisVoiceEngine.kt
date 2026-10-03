@@ -92,10 +92,9 @@ object JarvisVoiceEngine {
         activeJob = scope.launch {
             val apiKey = VoiceSettingsRepository.getInstance(context).getApiKey()
             if (apiKey.isBlank()) {
-                Log.w(TAG, "ElevenLabs API Key not configured")
-                _isSpeaking.value = false
+                Log.w(TAG, "ElevenLabs API Key not configured; falling back to device TTS")
                 _currentError.value = VoiceError.AuthenticationError()
-                onDone?.invoke()
+                speakDeviceTtsFallback(context, cleanedText, onDone)
                 return@launch
             }
 
@@ -108,12 +107,100 @@ object JarvisVoiceEngine {
                     playAudioBytes(context, audioBytes, onDone)
                 },
                 onFailure = { error ->
-                    Log.w(TAG, "Voice synthesis failed: ${error.message}")
-                    _isSpeaking.value = false
+                    Log.w(TAG, "ElevenLabs synthesis failed: ${error.message}; engaging device TTS fallback")
                     _currentError.value = VoiceError.SynthesisError(error.message ?: "Synthesis failed")
-                    onDone?.invoke()
+                    speakDeviceTtsFallback(context, cleanedText, onDone)
                 }
             )
+        }
+    }
+
+    private var deviceTts: android.speech.tts.TextToSpeech? = null
+    private var isDeviceTtsReady: Boolean = false
+    private val pendingTtsCallbacks = mutableListOf<() -> Unit>()
+
+    private fun ensureDeviceTts(context: Context, onReady: () -> Unit) {
+        if (isDeviceTtsReady && deviceTts != null) {
+            onReady()
+            return
+        }
+        pendingTtsCallbacks.add(onReady)
+        if (deviceTts == null) {
+            deviceTts = android.speech.tts.TextToSpeech(context.applicationContext) { status ->
+                if (status == android.speech.tts.TextToSpeech.SUCCESS) {
+                    isDeviceTtsReady = true
+                    deviceTts?.language = java.util.Locale.getDefault()
+                    deviceTts?.setSpeechRate(1.0f)
+                    deviceTts?.setPitch(1.0f)
+                } else {
+                    isDeviceTtsReady = false
+                }
+                val callbacks = pendingTtsCallbacks.toList()
+                pendingTtsCallbacks.clear()
+                callbacks.forEach { it.invoke() }
+            }
+        }
+    }
+
+    private fun speakDeviceTtsFallback(context: Context, text: String, onDone: (() -> Unit)?) {
+        scope.launch(Dispatchers.Main) {
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            ensureDeviceTts(context) {
+                val tts = deviceTts
+                if (tts == null || !isDeviceTtsReady) {
+                    _isSpeaking.value = false
+                    onDone?.invoke()
+                    return@ensureDeviceTts
+                }
+
+                // Detect script for appropriate TTS language
+                val hasHindi = text.any { it in '\u0900'..'\u097F' }
+                val hasBengali = text.any { it in '\u0980'..'\u09FF' }
+                try {
+                    val targetLocale = when {
+                        hasHindi -> java.util.Locale("hi", "IN")
+                        hasBengali -> java.util.Locale("bn", "IN")
+                        else -> java.util.Locale.US
+                    }
+                    if (tts.isLanguageAvailable(targetLocale) >= android.speech.tts.TextToSpeech.LANG_AVAILABLE) {
+                        tts.language = targetLocale
+                    }
+                } catch (_: Exception) {}
+
+                requestAudioFocus(audioManager)
+                _isSpeaking.value = true
+                val utteranceId = "jarvis_fallback_${System.currentTimeMillis()}"
+                tts.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+                    override fun onStart(id: String?) {
+                        _isSpeaking.value = true
+                        startBargeIn(context)
+                    }
+                    override fun onDone(id: String?) {
+                        stopBargeIn()
+                        abandonAudioFocus(audioManager)
+                        _isSpeaking.value = false
+                        onDone?.invoke()
+                    }
+                    override fun onError(id: String?) {
+                        stopBargeIn()
+                        abandonAudioFocus(audioManager)
+                        _isSpeaking.value = false
+                        onDone?.invoke()
+                    }
+                })
+
+                val params = android.os.Bundle().apply {
+                    putFloat(android.speech.tts.TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
+                }
+                val speakResult = tts.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, params, utteranceId)
+                if (speakResult != android.speech.tts.TextToSpeech.SUCCESS) {
+                    Log.w(TAG, "Device TTS speak() returned error code: $speakResult")
+                    stopBargeIn()
+                    abandonAudioFocus(audioManager)
+                    _isSpeaking.value = false
+                    onDone?.invoke()
+                }
+            }
         }
     }
 
@@ -156,11 +243,12 @@ object JarvisVoiceEngine {
                 setAudioAttributes(
                     AudioAttributes.Builder()
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
                         .build()
                 )
                 setDataSource(tempFile.absolutePath)
                 prepare()
+                setVolume(1.0f, 1.0f)
                 setOnCompletionListener {
                     stopBargeIn()
                     abandonAudioFocus(audioManager)
@@ -195,6 +283,10 @@ object JarvisVoiceEngine {
      */
     private fun startBargeIn(context: Context) {
         stopBargeIn()
+        // Only activate acoustic barge-in when in active LiveVoiceSession hands-free mode
+        if (!LiveVoiceSessionManager.isLiveSessionActive.value) {
+            return
+        }
         try {
             bargeInDetector = AcousticBargeInDetector(context) {
                 // User spoke! Interrupt immediately
@@ -236,6 +328,9 @@ object JarvisVoiceEngine {
         } catch (_: Exception) {}
 
         cleanAudioFile()
+        try {
+            deviceTts?.stop()
+        } catch (_: Exception) {}
         _isSpeaking.value = false
     }
 
@@ -265,6 +360,11 @@ object JarvisVoiceEngine {
 
     fun release() {
         stop()
+        try {
+            deviceTts?.shutdown()
+            deviceTts = null
+            isDeviceTtsReady = false
+        } catch (_: Exception) {}
     }
 
     private fun cleanAudioFile() {

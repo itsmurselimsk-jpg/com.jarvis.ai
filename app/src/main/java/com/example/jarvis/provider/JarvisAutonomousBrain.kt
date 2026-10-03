@@ -35,6 +35,20 @@ object JarvisAutonomousBrain {
         val lower = trimmed.lowercase(Locale.ROOT)
         val lang = JarvisPersonality.detectLanguageStyle(trimmed)
 
+        // Query training engine for direct trained response and active behavioral guidance
+        val trainingMatch = com.example.jarvis.training.TrainingEngine.matchRelevantTraining(
+            trimmed,
+            "AUTONOMOUS",
+            lang.name
+        )
+
+        if (!trainingMatch.directTrainedResponse.isNullOrBlank()) {
+            return com.example.jarvis.training.TrainingEngine.applyPostTrainingTransformations(
+                trainingMatch.directTrainedResponse,
+                trainingMatch
+            )
+        }
+
         // Calculate dynamic confidence rating based on linguistic clarity & domain match
         val dynamicConfidence = if (trimmed.length > 5) 0.985 + ((trimmed.hashCode() % 15) / 1000.0) else 0.994
         currentTelemetry = CognitiveTelemetry(
@@ -47,47 +61,49 @@ object JarvisAutonomousBrain {
         // 0. User feedback & comprehension calibration handler
         val feedbackResponse = tryHandleComprehensionFeedback(lower, trimmed, lang)
         if (feedbackResponse != null) {
-            return feedbackResponse
+            return com.example.jarvis.training.TrainingEngine.applyPostTrainingTransformations(feedbackResponse, trainingMatch)
         }
 
         // 1. Math and arithmetic calculation
         val mathResult = tryEvaluateMath(trimmed)
         if (mathResult != null) {
-            return formatMathResponse(trimmed, mathResult, lang)
+            val resp = formatMathResponse(trimmed, mathResult, lang)
+            return com.example.jarvis.training.TrainingEngine.applyPostTrainingTransformations(resp, trainingMatch)
         }
 
         // 2. Code & Programming Generation
         val codeResponse = tryGenerateCodeResponse(lower, lang)
         if (codeResponse != null) {
-            return codeResponse
+            return com.example.jarvis.training.TrainingEngine.applyPostTrainingTransformations(codeResponse, trainingMatch)
         }
 
         // 3. Writing / Letter / Email / Timetable Generation
         val writingResponse = tryGenerateWritingTemplate(lower, lang)
         if (writingResponse != null) {
-            return writingResponse
+            return com.example.jarvis.training.TrainingEngine.applyPostTrainingTransformations(writingResponse, trainingMatch)
         }
 
         // 4. Science, Technology & General Knowledge
         val knowledgeResponse = tryGenerateKnowledgeResponse(lower, lang)
         if (knowledgeResponse != null) {
-            return knowledgeResponse
+            return com.example.jarvis.training.TrainingEngine.applyPostTrainingTransformations(knowledgeResponse, trainingMatch)
         }
 
         // 5. Entertainment, Storytelling, Jokes, Shayari, Motivation
         val creativeResponse = tryGenerateCreativeResponse(lower, lang)
         if (creativeResponse != null) {
-            return creativeResponse
+            return com.example.jarvis.training.TrainingEngine.applyPostTrainingTransformations(creativeResponse, trainingMatch)
         }
 
         // 6. Identity, Capabilities & Assistance Guidance
         val assistantResponse = tryGenerateAssistantResponse(lower, lang)
         if (assistantResponse != null) {
-            return assistantResponse
+            return com.example.jarvis.training.TrainingEngine.applyPostTrainingTransformations(assistantResponse, trainingMatch)
         }
 
         // 7. Conversational Deep Fallback
-        return generateConversationalDeepReply(trimmed, lower, lang)
+        val deepReply = generateConversationalDeepReply(trimmed, lower, lang)
+        return com.example.jarvis.training.TrainingEngine.applyPostTrainingTransformations(deepReply, trainingMatch)
     }
 
     private fun tryHandleComprehensionFeedback(lower: String, original: String, lang: LanguageStyle): String? {

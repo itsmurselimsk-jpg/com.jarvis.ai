@@ -59,9 +59,17 @@ class GeminiAIProvider(
         onChunkReceived: (String) -> Unit
     ): String = withContext(Dispatchers.IO) {
         val settings = repository.settings.value
-        val effectiveApiKey = settings.customApiKey.ifBlank { BuildConfig.GEMINI_API_KEY }
+        val effectiveApiKey = when {
+            settings.customApiKey.isNotBlank() -> settings.customApiKey
+            BuildConfig.GEMINI_API_KEY.isNotBlank() && BuildConfig.GEMINI_API_KEY != "MY_GEMINI_API_KEY" -> BuildConfig.GEMINI_API_KEY
+            BuildConfig.ENV_GEMINI_API_KEY.isNotBlank() && BuildConfig.ENV_GEMINI_API_KEY != "MY_GEMINI_API_KEY" -> BuildConfig.ENV_GEMINI_API_KEY
+            else -> try {
+                val env = System.getenv("GEMINI_API_KEY") ?: ""
+                if (env.isNotBlank() && env != "MY_GEMINI_API_KEY") env else ""
+            } catch (_: Exception) { "" }
+        }
 
-        if (effectiveApiKey.isBlank() || effectiveApiKey == "MY_GEMINI_API_KEY") {
+        if (effectiveApiKey.isBlank()) {
             return@withContext LocalNeuralBrainProvider.generateLocalResponse(prompt, onChunkReceived)
         }
 
@@ -622,11 +630,19 @@ class JarvisUnifiedAIProvider(
 
     private fun getActiveProvider(): AIProvider {
         val settings = repository.settings.value
-        val effectiveKey = settings.customApiKey.ifBlank { BuildConfig.GEMINI_API_KEY }
+        val effectiveKey = when {
+            settings.customApiKey.isNotBlank() -> settings.customApiKey
+            BuildConfig.GEMINI_API_KEY.isNotBlank() && BuildConfig.GEMINI_API_KEY != "MY_GEMINI_API_KEY" -> BuildConfig.GEMINI_API_KEY
+            BuildConfig.ENV_GEMINI_API_KEY.isNotBlank() && BuildConfig.ENV_GEMINI_API_KEY != "MY_GEMINI_API_KEY" -> BuildConfig.ENV_GEMINI_API_KEY
+            else -> try {
+                val env = System.getenv("GEMINI_API_KEY") ?: ""
+                if (env.isNotBlank() && env != "MY_GEMINI_API_KEY") env else ""
+            } catch (_: Exception) { "" }
+        }
 
         return when {
             settings.providerType == AIProviderType.OPENAI_COMPATIBLE && settings.customApiKey.isNotBlank() -> openAi
-            settings.providerType == AIProviderType.GEMINI && effectiveKey.isNotBlank() && effectiveKey != "MY_GEMINI_API_KEY" -> gemini
+            settings.providerType == AIProviderType.GEMINI && effectiveKey.isNotBlank() -> gemini
             else -> object : AIProvider {
                 override suspend fun generateResponse(
                     prompt: String,

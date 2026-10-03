@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.jarvis.training.BatchAnalysisSummary
 import com.example.jarvis.training.BatchApplyResult
+import com.example.jarvis.training.BatchTrainingItemType
 import com.example.jarvis.training.BehaviorRule
 import com.example.jarvis.training.ConversationTraining
 import com.example.jarvis.training.ParsedBatchDirective
@@ -164,6 +165,45 @@ class TrainerViewModel(application: Application) : AndroidViewModel(application)
         _batchSummary.value = PromptBatchTrainingEngine.summarize(updated)
     }
 
+    fun clearBatchPrompt() {
+        _batchPromptText.value = ""
+        _isReviewMode.value = false
+        _parsedDirectives.value = emptyList()
+    }
+
+    fun applyPromptDirectly() {
+        val text = _batchPromptText.value.trim()
+        if (text.isBlank()) return
+
+        viewModelScope.launch {
+            _isApplying.value = true
+            _syncMessage.value = "Compiling & applying training directly to JARVIS..."
+            var directives = PromptBatchTrainingEngine.parseTrainingPrompt(text)
+            if (directives.isEmpty()) {
+                // If unstructured text, wrap as a behavioral training directive
+                directives = listOf(
+                    ParsedBatchDirective(
+                        rawInstruction = text,
+                        type = BatchTrainingItemType.BEHAVIOR,
+                        title = "Custom User Directive",
+                        ruleText = text,
+                        goodResponseExample = text
+                    )
+                )
+            }
+            val result = repository.applyBatch(
+                directives = directives,
+                batchDescription = "Direct Batch Training"
+            )
+            _isApplying.value = false
+            _batchPromptText.value = "" // Cleared immediately so user can type the next prompt!
+            _parsedDirectives.value = emptyList()
+            _isReviewMode.value = false
+            _batchApplyResult.value = result
+            _syncMessage.value = "✓ Training applied to JARVIS! (v${result.version} • Rules: ${result.rulesCount} • Examples: ${result.examplesCount}). Prompt cleared."
+        }
+    }
+
     fun applyBatchToJarvis() {
         viewModelScope.launch {
             _isApplying.value = true
@@ -174,6 +214,7 @@ class TrainerViewModel(application: Application) : AndroidViewModel(application)
             )
             _isApplying.value = false
             _batchApplyResult.value = result
+            _batchPromptText.value = "" // Auto-clear prompt so user can enter the next one
             _syncMessage.value = "Batch Training applied! v${result.version} (Rules: ${result.rulesCount}, Examples: ${result.examplesCount})"
         }
     }
@@ -181,6 +222,8 @@ class TrainerViewModel(application: Application) : AndroidViewModel(application)
     fun dismissApplyResult() {
         _batchApplyResult.value = null
         _isReviewMode.value = false
+        _batchPromptText.value = "" // Clear prompt box ready for next input
+        _parsedDirectives.value = emptyList()
     }
 
     // --- END BATCH METHODS ---

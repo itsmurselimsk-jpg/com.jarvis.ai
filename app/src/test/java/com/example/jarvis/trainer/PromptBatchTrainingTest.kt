@@ -151,4 +151,48 @@ class PromptBatchTrainingTest {
         assertTrue(rollbackResult.version > batchResult.version)
         assertEquals(v1Bundle.rules.size, trainerRepo.currentBundle.value.rules.size)
     }
+
+    @Test
+    fun testUserDirectDialogueAndHinglishTraining_immediatelyDelivered() {
+        val trainerRepo = TrainerRepository(context)
+
+        // Training input with Hinglish triggers and dialogue
+        val prompt = """
+            jab main bolu hi to bolo haan boss
+            call me Boss
+            bhai mat bolo
+        """.trimIndent()
+
+        val parsed = PromptBatchTrainingEngine.parseTrainingPrompt(prompt)
+        val batchResult = trainerRepo.applyBatch(parsed, "Hinglish Training Batch")
+        assertTrue(batchResult.isSynced)
+
+        // Test matching
+        val match = TrainingEngine.matchRelevantTraining("hi", "GREETING", "HINGLISH")
+        assertNotNull(match.directTrainedResponse)
+        assertEquals("haan boss", match.directTrainedResponse?.lowercase()?.trim())
+        assertEquals("Boss", match.preferredTitle)
+        assertTrue(match.forbiddenWords.contains("bhai"))
+
+        // Test post-transformation replaces forbidden words and applies title
+        val transformed = TrainingEngine.applyPostTrainingTransformations("hello bhai", match)
+        assertTrue(transformed.contains("Boss"))
+        assertFalse(transformed.contains("bhai"))
+    }
+
+    @Test
+    fun testApplyPromptDirectly_clearsPromptTextImmediately() {
+        val app = ApplicationProvider.getApplicationContext<android.app.Application>()
+        val vm = com.example.trainer.TrainerViewModel(app)
+
+        vm.setBatchPromptText("hi -> haan boss\ncall me Boss")
+        assertEquals("hi -> haan boss\ncall me Boss", vm.batchPromptText.value)
+
+        vm.applyPromptDirectly()
+
+        // Prompt text must be cleared immediately so user can enter the next one!
+        assertTrue(vm.batchPromptText.value.isEmpty())
+        assertNotNull(vm.batchApplyResult.value)
+        assertFalse(vm.isReviewMode.value)
+    }
 }

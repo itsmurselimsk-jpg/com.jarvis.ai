@@ -80,6 +80,16 @@ class VoiceSettingsRepository(private val context: Context) {
             return buildKey
         }
 
+        val buildEnvKey = try {
+            val k = BuildConfig.ENV_ELEVENLABS_API_KEY
+            if (k.isNotBlank() && k != "MY_ELEVENLABS_API_KEY") k else ""
+        } catch (_: Exception) {
+            ""
+        }
+        if (buildEnvKey.isNotBlank()) {
+            return buildEnvKey
+        }
+
         // Fallback to system environment variable
         return try {
             val envKey = System.getenv("ELEVENLABS_API_KEY")

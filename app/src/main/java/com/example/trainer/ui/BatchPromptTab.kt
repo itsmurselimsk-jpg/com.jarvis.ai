@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -90,6 +91,7 @@ fun BatchPromptTab(
     onPromptChange: (String) -> Unit,
     onLoadTemplate: (String) -> Unit,
     onAnalyzePrompt: () -> Unit,
+    onApplyDirectly: () -> Unit = {},
     onExitReview: () -> Unit,
     onCategoryFilterChange: (String) -> Unit,
     onToggleApproval: (String) -> Unit,
@@ -109,7 +111,8 @@ fun BatchPromptTab(
                 isAnalyzing = isAnalyzing,
                 onPromptChange = onPromptChange,
                 onLoadTemplate = onLoadTemplate,
-                onAnalyze = onAnalyzePrompt
+                onAnalyze = onAnalyzePrompt,
+                onApplyDirectly = onApplyDirectly
             )
         } else {
             // STEP 2: REVIEW DETECTED ITEMS BEFORE APPLYING
@@ -158,7 +161,8 @@ private fun PromptEditorView(
     isAnalyzing: Boolean,
     onPromptChange: (String) -> Unit,
     onLoadTemplate: (String) -> Unit,
-    onAnalyze: () -> Unit
+    onAnalyze: () -> Unit,
+    onApplyDirectly: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -249,12 +253,32 @@ private fun PromptEditorView(
                     fontFamily = FontFamily.Monospace,
                     color = TrainerTextPrimary
                 )
-                Text(
-                    text = "${promptText.lines().count { it.isNotBlank() }} directives  •  ${promptText.length} chars",
-                    fontSize = 10.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = TrainerTextDim
-                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "${promptText.lines().count { it.isNotBlank() }} directives  •  ${promptText.length} chars",
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = TrainerTextDim
+                    )
+                    if (promptText.isNotBlank()) {
+                        Surface(
+                            onClick = { onPromptChange("") },
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFF2E1A1A),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, TrainerRed.copy(alpha = 0.5f)),
+                            modifier = Modifier.testTag("btn_clear_prompt")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = "Clear", tint = TrainerRed, modifier = Modifier.size(12.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("CLEAR", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TrainerRed)
+                            }
+                        }
+                    }
+                }
             }
 
             OutlinedTextField(
@@ -262,8 +286,10 @@ private fun PromptEditorView(
                 onValueChange = onPromptChange,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(290.dp)
+                    .heightIn(min = 280.dp, max = 520.dp)
                     .testTag("batch_prompt_input"),
+                minLines = 10,
+                maxLines = 50,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = TrainerCyan,
                     unfocusedBorderColor = TrainerBorder,
@@ -274,14 +300,14 @@ private fun PromptEditorView(
                 ),
                 placeholder = {
                     Text(
-                        text = "Write your instructions here...\n\nExample:\n" +
-                                "JARVIS should call me naturally.\n" +
-                                "If I speak Bangla, reply in Bangla.\n" +
-                                "If I speak English, reply in English.\n" +
-                                "For destructive actions always ask for confirmation.\n" +
-                                "When I ask about battery, give the current battery percentage.\n" +
-                                "Be concise by default.\n" +
-                                "Do not sound robotic.",
+                        text = "Enter your training instructions here (large batch prompts supported)...\n\nExamples:\n" +
+                                "• Mujhe Boss bolo (address me as Boss)\n" +
+                                "• Bhai mat bolo\n" +
+                                "• When I say 'Hi', reply: 'Hello Boss! Sab ready hai.'\n" +
+                                "• Jab main puchu 'battery', give the real battery percentage\n" +
+                                "• If I speak Bangla, reply in pure Bengali\n" +
+                                "• Destructive actions always require confirmation\n" +
+                                "• Keep responses concise, direct and polite",
                         fontSize = 12.sp,
                         color = TrainerTextDim,
                         lineHeight = 18.sp
@@ -295,16 +321,16 @@ private fun PromptEditorView(
             )
         }
 
-        // Analyze Action Button (Requirement 3 & 4)
+        // Direct Apply Button (1-Click Apply & Auto-Clear Prompt)
         Button(
-            onClick = onAnalyze,
+            onClick = onApplyDirectly,
             enabled = promptText.isNotBlank() && !isAnalyzing,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp)
-                .testTag("analyze_training_button"),
+                .height(52.dp)
+                .testTag("apply_directly_button"),
             colors = ButtonDefaults.buttonColors(
-                containerColor = TrainerCyan,
+                containerColor = TrainerGreen,
                 contentColor = Color.Black
             ),
             shape = RoundedCornerShape(8.dp)
@@ -316,16 +342,39 @@ private fun PromptEditorView(
                     strokeWidth = 2.dp
                 )
                 Spacer(modifier = Modifier.width(10.dp))
-                Text("ANALYZING TRAINING PROMPT...", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text("APPLYING TO JARVIS...", fontSize = 12.sp, fontWeight = FontWeight.Bold)
             } else {
                 Icon(
-                    imageVector = Icons.Default.AutoAwesome,
+                    imageVector = Icons.Default.RocketLaunch,
                     contentDescription = null,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("ANALYZE TRAINING", fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                Text("APPLY DIRECTLY TO JARVIS (AUTO-CLEAR)", fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
             }
+        }
+
+        // Analyze & Review First Action Button
+        OutlinedButton(
+            onClick = onAnalyze,
+            enabled = promptText.isNotBlank() && !isAnalyzing,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(44.dp)
+                .testTag("analyze_training_button"),
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = TrainerCyan
+            ),
+            border = androidx.compose.foundation.BorderStroke(1.dp, TrainerCyan.copy(alpha = 0.7f)),
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.AutoAwesome,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("ANALYZE & REVIEW FIRST", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Monospace)
         }
     }
 }
@@ -879,7 +928,7 @@ fun BatchAppliedResultDialog(
                 colors = ButtonDefaults.buttonColors(containerColor = TrainerCyan, contentColor = Color.Black),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("DONE", fontWeight = FontWeight.Bold)
+                Text("DONE / ADD ANOTHER PROMPT", fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {

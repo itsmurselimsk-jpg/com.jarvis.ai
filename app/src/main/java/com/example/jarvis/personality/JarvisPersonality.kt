@@ -55,22 +55,29 @@ object JarvisPersonality {
             languageStyle.name
         )
 
+        // 1. Direct trained response from rules or training items takes top priority
+        if (!trainingMatch.directTrainedResponse.isNullOrBlank()) {
+            return com.example.jarvis.training.TrainingEngine.applyPostTrainingTransformations(
+                trainingMatch.directTrainedResponse,
+                trainingMatch
+            )
+        }
+
+        // 2. Good examples check
         if (trainingMatch.goodExamples.isNotEmpty()) {
-            val exactGood = trainingMatch.goodExamples.firstOrNull { it.first.equals(lower, ignoreCase = true) }
-            if (exactGood != null) {
-                return exactGood.second
+            val exactGood = trainingMatch.goodExamples.firstOrNull { 
+                lower.contains(it.first.lowercase()) || it.first.lowercase().contains(lower)
             }
-            // Pattern learning: If input is a variation of greeting and trained style is friendly/casual
+            if (exactGood != null) {
+                return com.example.jarvis.training.TrainingEngine.applyPostTrainingTransformations(
+                    exactGood.second,
+                    trainingMatch
+                )
+            }
+            // If input is greeting or matches any trained dialogue, use the user's trained response directly
+            val sampleGood = trainingMatch.goodExamples.first().second
             if (intent == ConversationIntent.GREETING) {
-                val sampleGood = trainingMatch.goodExamples.first().second
-                if (sampleGood.contains("bol", ignoreCase = true) || sampleGood.contains("bhai", ignoreCase = true) || sampleGood.contains("haan", ignoreCase = true)) {
-                    return when (lower) {
-                        "hello" -> "Hey 😄 Kya hua?"
-                        "hi jarvis" -> "Haan, bol 😄"
-                        "good morning" -> "Good morning bhai ☀️"
-                        else -> "Haan bhai, bol 😄"
-                    }
-                }
+                return com.example.jarvis.training.TrainingEngine.applyPostTrainingTransformations(sampleGood, trainingMatch)
             }
         }
 
@@ -110,7 +117,7 @@ object JarvisPersonality {
             }
         }
 
-        return when (intent) {
+        val rawResult = when (intent) {
             ConversationIntent.GREETING -> {
                 when (languageStyle) {
                     LanguageStyle.HINGLISH -> when {
@@ -184,6 +191,11 @@ object JarvisPersonality {
                 }
             }
         }
+
+        return com.example.jarvis.training.TrainingEngine.applyPostTrainingTransformations(
+            rawResult,
+            trainingMatch
+        )
     }
 
     /**

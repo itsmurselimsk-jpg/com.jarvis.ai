@@ -22,9 +22,9 @@ class AcousticBargeInDetector(
     companion object {
         private const val TAG = "AcousticBargeIn"
         private const val SAMPLE_RATE = 16000
-        private const val RMS_THRESHOLD = 1400.0 // Conversational speech energy threshold
-        private const val REQUIRED_CONSECUTIVE_FRAMES = 2
-        private const val STARTUP_GRACE_PERIOD_MS = 400L // Prevent TTS startup pop from false-triggering
+        private const val RMS_THRESHOLD = 3200.0 // Conversational speech energy threshold, prevents speaker feedback
+        private const val REQUIRED_CONSECUTIVE_FRAMES = 3
+        private const val STARTUP_GRACE_PERIOD_MS = 800L // Prevent TTS startup pop from false-triggering
     }
 
     private var audioRecord: AudioRecord? = null

@@ -122,6 +122,7 @@ fun JarvisTrainerApp(
                             onPromptChange = { viewModel.setBatchPromptText(it) },
                             onLoadTemplate = { viewModel.loadBatchTemplate(it) },
                             onAnalyzePrompt = { viewModel.analyzeBatchPrompt() },
+                            onApplyDirectly = { viewModel.applyPromptDirectly() },
                             onExitReview = { viewModel.exitReviewMode() },
                             onCategoryFilterChange = { viewModel.setReviewCategoryFilter(it) },
                             onToggleApproval = { viewModel.toggleDirectiveApproval(it) },

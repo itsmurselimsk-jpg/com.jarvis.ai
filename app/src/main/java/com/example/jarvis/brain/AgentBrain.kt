@@ -433,6 +433,39 @@ class AgentBrain(
                         executeAndDeliverTool(selectedTool, toolInput, input, onSpeaking, onIdle)
                     }
                 }
+            } else if (!behavioralContext.directTrainedResponse.isNullOrBlank()) {
+                // 1. Direct User-Trained Response Takes Highest Priority!
+                _currentPlanExplanation.value = "Applying active training directive..."
+                val finalTrainedResponse = com.example.jarvis.training.TrainingEngine.applyPostTrainingTransformations(
+                    behavioralContext.directTrainedResponse,
+                    behavioralContext
+                )
+                repository.addMessage(ChatMessage(sender = MessageSender.JARVIS, text = finalTrainedResponse))
+                recordTurn(input, finalTrainedResponse)
+                deliverFinalResponse(finalTrainedResponse, onSpeaking, onIdle)
+                return@launch
+            } else if (behavioralContext.goodExamples.isNotEmpty() &&
+                behavioralContext.goodExamples.any { ex ->
+                    val exUser = ex.first.trim().lowercase(java.util.Locale.ROOT)
+                    val inLower = input.trim().lowercase(java.util.Locale.ROOT)
+                    exUser == inLower || (exUser.length > 1 && (inLower.contains(exUser) || exUser.contains(inLower)))
+                }
+            ) {
+                // 2. Exact or close match in user-trained examples
+                _currentPlanExplanation.value = "Applying trained dialogue example..."
+                val inLower = input.trim().lowercase(java.util.Locale.ROOT)
+                val matchedExample = behavioralContext.goodExamples.first { ex ->
+                    val exUser = ex.first.trim().lowercase(java.util.Locale.ROOT)
+                    exUser == inLower || (exUser.length > 1 && (inLower.contains(exUser) || exUser.contains(inLower)))
+                }
+                val finalTrainedResponse = com.example.jarvis.training.TrainingEngine.applyPostTrainingTransformations(
+                    matchedExample.second,
+                    behavioralContext
+                )
+                repository.addMessage(ChatMessage(sender = MessageSender.JARVIS, text = finalTrainedResponse))
+                recordTurn(input, finalTrainedResponse)
+                deliverFinalResponse(finalTrainedResponse, onSpeaking, onIdle)
+                return@launch
             } else {
                 // Conversational reasoning via AIProvider
                 _currentPlanExplanation.value = "Synthesizing response with AI brain..."
@@ -513,10 +546,15 @@ class AgentBrain(
                     safeError.userSafeMessage
                 }
 
+                val transformedResponse = com.example.jarvis.training.TrainingEngine.applyPostTrainingTransformations(
+                    finalResponse,
+                    behavioralContext
+                )
+
                 _recoveryState.value = RecoveryState(status = RecoveryStatus.IDLE)
-                repository.finalizeStreamingMessage(finalResponse)
-                recordTurn(input, finalResponse)
-                deliverFinalResponse(finalResponse, onSpeaking, onIdle)
+                repository.finalizeStreamingMessage(transformedResponse)
+                recordTurn(input, transformedResponse)
+                deliverFinalResponse(transformedResponse, onSpeaking, onIdle)
             }
         }
     }

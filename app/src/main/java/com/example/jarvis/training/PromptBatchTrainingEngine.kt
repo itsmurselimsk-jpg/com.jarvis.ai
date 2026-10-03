@@ -80,37 +80,38 @@ Ensure all privacy-sensitive logs remain local on device.
         for (line in rawLines) {
             val lower = line.lowercase(Locale.ROOT)
 
-            // A. Check for explicit dialogue/example syntax
-            // e.g. "User: Hi | Jarvis: Hello Sir" or "When I say X -> reply Y"
+            // A. Check Language directives first (e.g. "If I speak Bangla, reply in Bangla")
+            if (isLanguageInstruction(lower)) {
+                directives.add(buildLanguageDirective(line, lower))
+                continue
+            }
+
+            // B. Check for explicit dialogue/example syntax
+            // e.g. "User: Hi | Jarvis: Hello Sir" or "When I say X -> reply Y" or "jab main bolu hi to bolo haan boss"
             val dialogueMatch = extractDialogueExample(line)
             if (dialogueMatch != null) {
                 directives.add(dialogueMatch)
                 continue
             }
 
-            // B. Classify based on semantic intent and domain
+            // C. Classify based on semantic intent and domain
             when {
-                // 1. Language Rules
-                isLanguageInstruction(lower) -> {
-                    directives.add(buildLanguageDirective(line, lower))
-                }
-
-                // 2. Safety & Destructive Confirmation Policies
+                // 1. Safety & Destructive Confirmation Policies
                 isSafetyInstruction(lower) -> {
                     directives.add(buildSafetyDirective(line, lower))
                 }
 
-                // 3. Personality & Tone Rules (Checked before tools so "sound robotic" is not confused with audio volume)
+                // 2. Personality & Tone Rules (Checked before tools so "sound robotic" is not confused with audio volume)
                 isPersonalityInstruction(lower) -> {
                     directives.add(buildPersonalityDirective(line, lower))
                 }
 
-                // 4. Tool & Hardware Action Rules
+                // 3. Tool & Hardware Action Rules
                 isToolInstruction(lower) -> {
                     directives.add(buildToolDirective(line, lower))
                 }
 
-                // 5. General Behavioral Instruction
+                // 4. General Behavioral Instruction
                 else -> {
                     directives.add(buildGeneralBehaviorDirective(line, lower))
                 }
@@ -130,9 +131,11 @@ Ensure all privacy-sensitive logs remain local on device.
     }
 
     private fun extractDialogueExample(line: String): ParsedBatchDirective? {
-        // Syntax 1: User: ... | Jarvis: ...
-        val userJarvisRegex = Regex("""(?i)(?:user|input|when i say|if i say)[:\s]+"?(.*?)"?\s*(?:\||->|then|jarvis says?|reply)[:\s]+"?(.*?)"?$""")
-        val match = userJarvisRegex.find(line)
+        val trimmed = line.trim()
+
+        // Syntax 1: User: ... | Jarvis: ... or User: ... -> Jarvis: ...
+        val userJarvisRegex = Regex("""(?i)(?:user|input|when i say|if i say)[:\s]+"?(.*?)"?\s*(?:\||->|=>|then|jarvis says?|reply)[:\s]+"?(.*?)"?$""")
+        val match = userJarvisRegex.find(trimmed)
         if (match != null) {
             val user = match.groupValues[1].trim()
             val response = match.groupValues[2].trim()
@@ -141,7 +144,7 @@ Ensure all privacy-sensitive logs remain local on device.
                     rawInstruction = line,
                     type = BatchTrainingItemType.RESPONSE_EXAMPLE,
                     category = TrainingCategories.CASUAL_CONVERSATION,
-                    title = "Dialogue Example: \"$user\"",
+                    title = "Dialogue: \"$user\"",
                     ruleText = "When user inputs \"$user\", respond with \"$response\".",
                     userInputExample = user,
                     goodResponseExample = response,
@@ -149,6 +152,125 @@ Ensure all privacy-sensitive logs remain local on device.
                 )
             }
         }
+
+        // Syntax 2: Arrow syntax: "Hi" -> "Hello Sir" or "Kya kar rahe ho" => "Aapka wait"
+        val arrowRegex = Regex("""^["']?(.*?)["']?\s*(?:->|=>)\s*["']?(.*?)["']?$""")
+        val arrowMatch = arrowRegex.find(trimmed)
+        if (arrowMatch != null && !trimmed.startsWith("http")) {
+            val user = arrowMatch.groupValues[1].trim()
+            val response = arrowMatch.groupValues[2].trim()
+            if (user.isNotBlank() && response.isNotBlank() && user.length < 100) {
+                return ParsedBatchDirective(
+                    rawInstruction = line,
+                    type = BatchTrainingItemType.RESPONSE_EXAMPLE,
+                    category = TrainingCategories.CASUAL_CONVERSATION,
+                    title = "Prompt Pattern: \"$user\"",
+                    ruleText = "When user says \"$user\", reply: \"$response\".",
+                    userInputExample = user,
+                    goodResponseExample = response,
+                    tone = TrainingTone.FRIENDLY
+                )
+            }
+        }
+
+        // Syntax 3: Hindi/Hinglish conditional: "jab main bolu X to bolo Y" or "agar kahu X to Y kehna"
+        val hindiCondRegex = Regex("""(?i)(?:jab|agar|yadi)\s+(?:main\s+|hum\s+)?(?:bolu|bolun|kahu|kahun|puchu|puchun|likhu)\s*[:\"'“‘]?(.*?)[?\"'”’]?\s+(?:to|tab|then)\s+(?:bolo|bolna|kaho|kehna|reply|jawab\s+do|answer)\s*[:\"'“‘]?(.*?)[.!?\"'”’]*$""")
+        val hindiMatch = hindiCondRegex.find(trimmed)
+        if (hindiMatch != null) {
+            val user = hindiMatch.groupValues[1].trim().removeSurrounding("\"").removeSurrounding("'")
+            val response = hindiMatch.groupValues[2].trim().removeSurrounding("\"").removeSurrounding("'")
+            if (user.isNotBlank() && response.isNotBlank()) {
+                return ParsedBatchDirective(
+                    rawInstruction = line,
+                    type = BatchTrainingItemType.RESPONSE_EXAMPLE,
+                    category = TrainingCategories.CASUAL_CONVERSATION,
+                    title = "Hinglish Trigger: \"$user\"",
+                    ruleText = line,
+                    userInputExample = user,
+                    goodResponseExample = response,
+                    tone = TrainingTone.FRIENDLY
+                )
+            }
+        }
+
+        // Syntax 4: Bangla conditional: "jodi boli X to bolbe Y" or "jotohon boli X to bolbe Y"
+        val banglaCondRegex = Regex("""(?i)(?:jodi|jotohon)\s+(?:ami\s+)?(?:boli|bolbo|jiggasa\s+kori)\s*[:\"'“‘]?(.*?)[?\"'”’]?\s+(?:tahole|to)\s+(?:bolbe|bolo|uttor\s+dao)\s*[:\"'“‘]?(.*?)[.!?\"'”’]*$""")
+        val banglaMatch = banglaCondRegex.find(trimmed)
+        if (banglaMatch != null) {
+            val user = banglaMatch.groupValues[1].trim().removeSurrounding("\"").removeSurrounding("'")
+            val response = banglaMatch.groupValues[2].trim().removeSurrounding("\"").removeSurrounding("'")
+            if (user.isNotBlank() && response.isNotBlank()) {
+                return ParsedBatchDirective(
+                    rawInstruction = line,
+                    type = BatchTrainingItemType.RESPONSE_EXAMPLE,
+                    category = TrainingCategories.BANGLA,
+                    title = "Bangla Trigger: \"$user\"",
+                    ruleText = line,
+                    userInputExample = user,
+                    goodResponseExample = response,
+                    tone = TrainingTone.FRIENDLY
+                )
+            }
+        }
+
+        // Syntax 5: English natural phrasing: "When asked about X reply with Y"
+        val engCondRegex = Regex("""(?i)(?:when\s+(?:i\s+|user\s+)?(?:say|ask|speaks?)|if\s+(?:i\s+|user\s+)?(?:say|ask|speaks?))\s*[:\"'“‘]?(.*?)[?\"'”’]?\s*(?:then|reply|respond|say|answer)\s*[:\"'“‘]?(.*?)[.!?\"'”’]*$""")
+        val engMatch = engCondRegex.find(trimmed)
+        if (engMatch != null) {
+            val user = engMatch.groupValues[1].trim().removeSurrounding("\"").removeSurrounding("'")
+            val response = engMatch.groupValues[2].trim().removeSurrounding("\"").removeSurrounding("'")
+            if (user.isNotBlank() && response.isNotBlank()) {
+                return ParsedBatchDirective(
+                    rawInstruction = line,
+                    type = BatchTrainingItemType.RESPONSE_EXAMPLE,
+                    category = TrainingCategories.CASUAL_CONVERSATION,
+                    title = "Dialogue: \"$user\"",
+                    ruleText = line,
+                    userInputExample = user,
+                    goodResponseExample = response,
+                    tone = TrainingTone.HELPFUL
+                )
+            }
+        }
+
+        // Syntax 6: Title preference: "mujhe Boss bolo" / "call me Boss" / "amake Boss bolbe"
+        val titleMatch = Regex("""(?i)(?:mujhe|mereko|amake|call\s+me)\s+([a-zA-Z\u0900-\u097F\u0980-\u09FF]+)\s*(?:bolo|bulao|bolbe)?""").find(trimmed)
+        if (titleMatch != null) {
+            val title = titleMatch.groupValues[1].trim().replaceFirstChar { it.uppercase() }
+            if (title.isNotBlank() && !title.equals("bhai", ignoreCase = true) && !title.equals("kuch", ignoreCase = true)) {
+                return ParsedBatchDirective(
+                    rawInstruction = line,
+                    type = BatchTrainingItemType.PERSONALITY,
+                    category = TrainingCategories.CASUAL_CONVERSATION,
+                    title = "Preferred Title: $title",
+                    ruleText = "Always address user as $title instead of bhai.",
+                    userInputExample = null,
+                    goodResponseExample = null,
+                    tone = TrainingTone.FRIENDLY
+                )
+            }
+        }
+
+        // Syntax 7: Forbidden word: "bhai mat bolo" / "don't call me bhai"
+        if (trimmed.contains("bhai mat bolo", ignoreCase = true) ||
+            trimmed.contains("bhai mat bol", ignoreCase = true) ||
+            trimmed.contains("don't call me bhai", ignoreCase = true) ||
+            trimmed.contains("dont call me bhai", ignoreCase = true) ||
+            trimmed.contains("bhai bolna band karo", ignoreCase = true)
+        ) {
+            return ParsedBatchDirective(
+                rawInstruction = line,
+                type = BatchTrainingItemType.PERSONALITY,
+                category = TrainingCategories.CASUAL_CONVERSATION,
+                title = "Forbidden Word: 'bhai'",
+                ruleText = "Never address the user as 'bhai' or 'bro'. Always address respectfully as Sir or Boss.",
+                userInputExample = null,
+                goodResponseExample = null,
+                badResponseExample = "Hi bhai 😄",
+                tone = TrainingTone.SERIOUS
+            )
+        }
+
         return null
     }
 
