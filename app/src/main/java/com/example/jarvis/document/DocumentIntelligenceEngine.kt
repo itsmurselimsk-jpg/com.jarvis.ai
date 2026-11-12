@@ -139,7 +139,8 @@ object DocumentIntelligenceEngine {
     fun formatContextForBrain(
         document: DocumentModel,
         summary: DocumentSummary,
-        analysis: FileAnalysisResult
+        analysis: FileAnalysisResult,
+        query: String? = null
     ): String {
         val sb = StringBuilder()
         sb.appendLine("=== ACTIVE DOCUMENT DATA CONTEXT ===")
@@ -174,14 +175,23 @@ object DocumentIntelligenceEngine {
             }
         }
 
-        // Add sanitized preview of text
-        val preview = if (document.containsSensitiveData || analysis.containsSensitiveData) {
-            SensitiveDataFilter.sanitizeForDisplay(document.extractedText)
+        // Check if query produces targeted RAG retrieved passages
+        val ragContext = if (!query.isNullOrBlank()) {
+            DocumentRagEngine.formatRagContextForBrain(document, query)
+        } else ""
+
+        if (ragContext.isNotBlank()) {
+            sb.appendLine(ragContext)
         } else {
-            document.extractedText
+            // Add sanitized preview of text
+            val preview = if (document.containsSensitiveData || analysis.containsSensitiveData) {
+                SensitiveDataFilter.sanitizeForDisplay(document.extractedText)
+            } else {
+                document.extractedText
+            }
+            sb.appendLine("Document Content Preview:")
+            sb.appendLine("\"${preview.take(1200)}\"")
         }
-        sb.appendLine("Document Content Preview:")
-        sb.appendLine("\"${preview.take(800)}\"")
 
         if (summary.containsSensitiveData || analysis.containsSensitiveData) {
             val sensitiveItems = (summary.sensitiveDataTypes + analysis.sensitiveDataTypes).distinct()

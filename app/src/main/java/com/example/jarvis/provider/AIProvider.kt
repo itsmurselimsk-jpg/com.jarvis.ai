@@ -340,7 +340,7 @@ object LocalNeuralBrainProvider {
         } else if (intentResult.intent == com.example.jarvis.intent.ConversationIntent.SYSTEM_STATUS) {
             "All JARVIS subsystems are online. Core matrices, battery, network, Wi-Fi, and autonomous memory stores are operating normally."
         } else {
-            JarvisAutonomousBrain.generateAutonomousResponse(textToProcess)
+            JarvisAutonomousBrain.generateAutonomousResponse(textToProcess, prompt)
         }
 
         // Stream text smoothly with realistic cadence

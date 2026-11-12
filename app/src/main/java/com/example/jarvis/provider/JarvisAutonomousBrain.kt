@@ -30,7 +30,7 @@ object JarvisAutonomousBrain {
     var currentTelemetry = CognitiveTelemetry()
         private set
 
-    fun generateAutonomousResponse(userInput: String): String {
+    fun generateAutonomousResponse(userInput: String, contextPrompt: String = ""): String {
         val trimmed = userInput.trim()
         val lower = trimmed.lowercase(Locale.ROOT)
         val lang = JarvisPersonality.detectLanguageStyle(trimmed)
@@ -47,6 +47,40 @@ object JarvisAutonomousBrain {
                 trainingMatch.directTrainedResponse,
                 trainingMatch
             )
+        }
+
+        // RAG Context Evaluation: If user is asking about an attached document
+        if (contextPrompt.contains("RAG RETRIEVED DOCUMENT PASSAGES") || contextPrompt.contains("ACTIVE DOCUMENT DATA CONTEXT")) {
+            val ragPassage = contextPrompt.substringAfter("Passage 1", "").substringAfter("):", "").substringBefore("Passage 2", "").substringBefore("CITATION", "").trim().trim('"')
+            val docName = contextPrompt.substringAfter("File: ", "").substringBefore(" |", "").ifBlank { "the document" }
+            if (ragPassage.isNotBlank()) {
+                val ragResponse = when (lang) {
+                    LanguageStyle.BENGALI, LanguageStyle.BANGLISH ->
+                        "$docName থেকে প্রাপ্ত তথ্যানুযায়ী:\n\n\"${ragPassage.take(300)}\"\n\n👉 আপনার ডকুমেন্টের এই অংশটিতে সরাসরি আপনার প্রশ্নের উত্তর রয়েছে। আরও বিস্তারিত জানতে চাইলে নির্দ্বিধায় বলুন!"
+                    LanguageStyle.HINDI, LanguageStyle.HINGLISH ->
+                        "$docName के अनुसार:\n\n\"${ragPassage.take(300)}\"\n\n👉 आपके डॉक्यूमेंट से यह सटीक संदर्भ प्राप्त हुआ है। क्या आप इसमें से कुछ और समझना चाहते हैं?"
+                    else ->
+                        "According to $docName:\n\n\"${ragPassage.take(300)}\"\n\n👉 This passage from your active document directly addresses your query."
+                }
+                return com.example.jarvis.training.TrainingEngine.applyPostTrainingTransformations(ragResponse, trainingMatch)
+            }
+        }
+
+        // Long-Term Memory Recall Evaluation: If user asks about their own saved facts
+        if (contextPrompt.contains("RELEVANT LONG-TERM MEMORIES")) {
+            val memoryLines = contextPrompt.lines().filter { it.trim().startsWith("•") }
+            if (memoryLines.isNotEmpty() && (lower.contains("mera") || lower.contains("amar") || lower.contains("my ") || lower.contains("remember") || lower.contains("yaad"))) {
+                val memorySummary = memoryLines.joinToString("\n") { it.trim() }
+                val memResponse = when (lang) {
+                    LanguageStyle.BENGALI, LanguageStyle.BANGLISH ->
+                        "আমার লং-টার্ম মেমরিতে সংরক্ষিত তথ্য অনুযায়ী:\n\n$memorySummary\n\nসবকিছু সঠিকভাবে নোট করা আছে, স্যার!"
+                    LanguageStyle.HINDI, LanguageStyle.HINGLISH ->
+                        "मेरी लॉन्ग-टर्म मेमोरी (Room Database) के अनुसार:\n\n$memorySummary\n\nसर, यह जानकारी मैंने आपके लिए सुरक्षित रखी हुई है।"
+                    else ->
+                        "According to your saved long-term memories in my database:\n\n$memorySummary\n\nAll records are up-to-date and accessible, Sir."
+                }
+                return com.example.jarvis.training.TrainingEngine.applyPostTrainingTransformations(memResponse, trainingMatch)
+            }
         }
 
         // Calculate dynamic confidence rating based on linguistic clarity & domain match
@@ -112,6 +146,46 @@ object JarvisAutonomousBrain {
                 lower.contains("dhang se") || lower.contains("theek se") || lower.contains("galat bol") ||
                 lower.contains("meri baat") || lower.contains("samjhega") || lower.contains("bujhte parchho na") ||
                 lower.contains("bhalo kore bolo") || lower.contains("not understanding") || lower.contains("understand me")
+
+        val isCutOffQuestion = lower.contains("band kyon ho raha") || lower.contains("band kyu ho raha") ||
+                lower.contains("band kyu") || lower.contains("ruk kyu") || lower.contains("ruk kyo") ||
+                lower.contains("ruk jata hai") || lower.contains("theme jacche") || lower.contains("theme jay keno") ||
+                lower.contains("cut off") || (lower.contains("bolte") && lower.contains("band")) ||
+                (lower.contains("bolate") && lower.contains("band"))
+
+        if (isCutOffQuestion) {
+            return when (lang) {
+                LanguageStyle.BANGLISH, LanguageStyle.BENGALI ->
+                    "হ্যাঁ ভাই, একদম পরিষ্কারভাবে বলছি কেন এমন হচ্ছিল!\n\n" +
+                    "**আসল কারণ:**\n" +
+                    "আগে Acoustic Barge-In ডিটেক্টরটি মাত্র ৩,২০০ RMS থ্রেশহোল্ডে র' মাইক দিয়ে চলছিল। ফোনটির স্পিকার থেকে যখন আমার আওয়াজ বের হচ্ছিল, তখন সেই স্পিকারের সাউন্ড মাইকে লিক হয়ে ৫,০০০–৯,০০০ RMS তৈরি করছিল। ডিটেক্টর ভেবেছিল আপনি কথা বলছেন, তাই আমার কথা মাঝপথেই কেটে দিচ্ছিল!\n\n" +
+                    "**আমরা এটি স্থায়ীভাবে সমাধান করেছি:**\n" +
+                    "১. `VOICE_COMMUNICATION` এবং হার্ডওয়্যার Acoustic Echo Canceler (AEC) সক্রিয় করা হয়েছে।\n" +
+                    "২. থ্রেশহোল্ড বাড়িয়ে ১১,৫০০+ RMS এবং স্পিকার সাউন্ডের অ্যাডাপ্টিভ ক্যালিব্রেশন যোগ করা হয়েছে—ফলে স্পিকারের আওয়াজে আর সেল্ফ-ইন্টারাপ্ট হবে না।\n" +
+                    "৩. অডিও ফোকাস ট্রানজিয়েন্ট ডাক প্রটেকশন যোগ করা হয়েছে।\n\n" +
+                    "এখন থেকে কথা বলার সময় মাঝপথে আর কখনও কাটবে না! বলুন ভাই, আর কী জানতে বা করাতে চান?"
+
+                LanguageStyle.HINDI, LanguageStyle.HINGLISH ->
+                    "हाँ भाई, बिल्कुल बता सकता हूँ कि ऐसा क्यों हो रहा था!\n\n" +
+                    "**समस्या की असली वजह:**\n" +
+                    "पहले Acoustic Barge-In डिटेक्टर सिर्फ 3,200 RMS थ्रेशोल्ड पर सामान्य माइक से चल रहा था। जब फोन के लाउडस्पीकर से मेरी आवाज़ निकलती थी, तो वही आवाज़ माइक में 5,000–9,000 RMS का इनपुट बना देती थी। डिटेक्टर को लगता था कि आप बोल रहे हैं, और वह मेरी आवाज़ को बीच में ही काट (mute) देता था!\n\n" +
+                    "**हमने इसे पूरी तरह ठीक कर दिया है:**\n" +
+                    "1. हार्डवेयर Acoustic Echo Cancellation (AEC) को `VOICE_COMMUNICATION` के साथ जोड़ दिया है।\n" +
+                    "2. थ्रेशोल्ड को 11,500+ RMS और एडेप्टिव बेसलाइन कैलिब्रेशन पर सेट किया है — अब स्पीकर की अपनी आवाज़ से स्पीच कभी नहीं रुकेगी।\n" +
+                    "3. ऑडियो फोकस डकिंग से स्पीच बंद होने की समस्या को भी हल कर दिया है।\n\n" +
+                    "अब मैं बिना रुके पूरी बात बोलूँगा! बताइए भाई, अब क्या निर्देश है?"
+
+                else ->
+                    "Yes! Here is exactly why that speech cut-off was occurring:\n\n" +
+                    "**The Root Cause:**\n" +
+                    "The Acoustic Barge-In detector was previously operating with a low 3,200 RMS threshold on raw microphone audio. When JARVIS spoke through the device loudspeaker, the acoustic energy leaking back into the adjacent microphone reached 5,000–9,000 RMS. The detector mistakenly identified this as user speech and self-interrupted mid-sentence.\n\n" +
+                    "**The Solution Implemented:**\n" +
+                    "1. Migrated audio recording to `VOICE_COMMUNICATION` with hardware `AcousticEchoCanceler` and `NoiseSuppressor`.\n" +
+                    "2. Elevated detection threshold to 11,500+ RMS with real-time speaker playback baseline calibration.\n" +
+                    "3. Shielded audio focus against transient ducking interruptions.\n\n" +
+                    "Speech will now play continuously without cutting off midway!"
+            }
+        }
 
         if (isFeedback) {
             return when (lang) {

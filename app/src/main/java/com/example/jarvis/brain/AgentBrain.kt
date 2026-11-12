@@ -61,9 +61,13 @@ class AgentBrain(
     private val _lastExtractedData = MutableStateFlow<ExtractedData?>(null)
     val lastExtractedData: StateFlow<ExtractedData?> = _lastExtractedData.asStateFlow()
 
-    // Short-term conversation context buffer: stores last N turns without sending entire history to provider
+    // Context-Aware Dialogue & Long-Term Memory Engines
+    val contextAwareEngine = ContextAwareEngine(maxHistoryTurns = 8)
+    val longTermMemoryManager by lazy { com.example.jarvis.memory.LongTermMemoryManager(repository) }
+
+    // Short-term conversation context buffer: stores last N turns for gating/backward-compat
     private val conversationBuffer = mutableListOf<Pair<String, String>>()
-    private val maxBufferTurns = 4
+    private val maxBufferTurns = 6
 
     // Recent tool execution tracking
     private var lastExecutedToolName: String? = null
@@ -265,18 +269,26 @@ class AgentBrain(
                 }
             }
 
-            // Active Document Context if available
+            // Coreference resolution across conversation turns
+            val resolvedInput = contextAwareEngine.resolveCoreference(input)
+            val temporalContext = contextAwareEngine.getTemporalAndSituationalContext(bridge.telemetry.value)
+            val conversationHistory = contextAwareEngine.formatConversationHistoryForPrompt()
+
+            // Active Document Context if available with Document RAG
             val doc = activeDocument
             if (doc != null && doc.isSuccessful()) {
                 val summary = activeDocumentSummary ?: com.example.jarvis.document.DocumentIntelligenceEngine.analyze(doc)
                 val analysis = activeFileAnalysis ?: com.example.jarvis.document.AdvancedFileAnalyzer.analyze(doc)
-                contextBuilder.appendLine(com.example.jarvis.document.DocumentIntelligenceEngine.formatContextForBrain(doc, summary, analysis))
+                contextBuilder.appendLine(com.example.jarvis.document.DocumentIntelligenceEngine.formatContextForBrain(doc, summary, analysis, resolvedInput))
             }
 
             val contextString = contextBuilder.toString().trimEnd()
 
-            // Extract facts into long-term knowledge graph
+            // Extract facts into long-term knowledge graph and Room Database
             com.example.jarvis.memory.KnowledgeGraphEngine.extractFactsFromConversation(input)
+            try {
+                longTermMemoryManager.extractAndPersistMemories(input)
+            } catch (_: Exception) {}
 
             // 1b. Intent Classification & Language Style
             val intentResult = com.example.jarvis.intent.IntentClassifier.classify(input)
@@ -348,9 +360,9 @@ class AgentBrain(
                 com.example.jarvis.provider.ToolDecision(false, null, input, "Conversational intent: ${intentResult.intent}")
             } else {
                 aiProvider.decideTool(
-                    userInput = input,
+                    userInput = resolvedInput,
                     availableTools = registry.getToolDefinitions(),
-                    contextHistory = "$contextString\n$relevantMemories\n${behavioralContext.promptGuidance}"
+                    contextHistory = "$temporalContext\n$conversationHistory\n$contextString\n$relevantMemories\n${behavioralContext.promptGuidance}"
                 )
             }
 
@@ -473,11 +485,19 @@ class AgentBrain(
                 repository.addMessage(streamingMessage)
 
                 val prompt = com.example.jarvis.security.PrivacyRedactionGuard.redact(buildString {
+                    if (temporalContext.isNotBlank()) {
+                        appendLine(temporalContext)
+                    }
+                    if (conversationHistory.isNotBlank()) {
+                        appendLine(conversationHistory)
+                    }
                     if (relevantMemories.isNotBlank()) {
                         appendLine(relevantMemories)
                     }
-                    appendLine(contextString)
-                    appendLine("User: $input")
+                    if (contextString.isNotBlank()) {
+                        appendLine(contextString)
+                    }
+                    appendLine("User: $resolvedInput")
                 })
 
                 val dynamicSystemInstruction = if (repository.settings.value.systemPrompt.isNotBlank() &&
@@ -633,6 +653,7 @@ class AgentBrain(
     }
 
     private fun recordTurn(userInput: String, assistantOutput: String) {
+        contextAwareEngine.recordTurn(userInput, assistantOutput)
         conversationBuffer.add(Pair(userInput, assistantOutput))
         while (conversationBuffer.size > maxBufferTurns) {
             conversationBuffer.removeAt(0)
@@ -670,33 +691,7 @@ class AgentBrain(
     private fun retrieveRelevantMemories(query: String): String {
         val memories = repository.memories.value
         if (memories.isEmpty()) return ""
-
-        val cleaned = query.lowercase().trim()
-        val stopWords = setOf("the", "a", "an", "is", "are", "was", "were", "what", "where", "who", "how", "when", "why", "my", "your", "me", "you", "i", "to", "in", "on", "for", "with", "about", "tell", "jarvis", "please", "can")
-        val queryTokens = cleaned.split(Regex("[^a-zA-Z0-9]+")).filter { it.length > 2 && !stopWords.contains(it) }
-
-        // Scored retrieval
-        val scored = memories.map { mem ->
-            var score = 0
-            val titleLower = mem.title.lowercase()
-            val contentLower = mem.content.lowercase()
-
-            if (titleLower.contains(cleaned) || contentLower.contains(cleaned)) {
-                score += 10
-            }
-
-            for (token in queryTokens) {
-                if (titleLower.contains(token)) score += 3
-                if (contentLower.contains(token)) score += 2
-            }
-
-            Pair(mem, score)
-        }.filter { it.second > 0 }
-         .sortedByDescending { it.second }
-         .take(4)
-
-        return if (scored.isNotEmpty()) {
-            "RELEVANT LONG-TERM MEMORIES:\n" + scored.joinToString("\n") { "• [${it.first.title}] ${it.first.content}" }
-        } else ""
+        val scored = longTermMemoryManager.searchMemoriesBM25(query, memories, topK = 4)
+        return longTermMemoryManager.formatMemoriesForContext(scored)
     }
 }

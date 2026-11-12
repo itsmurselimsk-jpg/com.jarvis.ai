@@ -351,7 +351,7 @@ class AndroidBridge(private val context: Context) {
             val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
                 .setAudioAttributes(playbackAttributes)
                 .setOnAudioFocusChangeListener { focusChange ->
-                    if (focusChange == AudioManager.AUDIOFOCUS_LOSS || focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
+                    if (focusChange == AudioManager.AUDIOFOCUS_LOSS) {
                         stopSpeaking()
                     }
                 }

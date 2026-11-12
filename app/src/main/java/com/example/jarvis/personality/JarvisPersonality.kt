@@ -236,28 +236,44 @@ object JarvisPersonality {
         val brief = rawResult.trim()
         return when (toolName.lowercase(Locale.ROOT)) {
             "flashlight" -> when (languageStyle) {
+                LanguageStyle.BENGALI -> "ফ্ল্যাশলাইট অন/অফ সম্পন্ন হয়েছে, স্যার।"
+                LanguageStyle.BANGLISH -> "Flashlight state change kora hoyechhe, Sir."
+                LanguageStyle.HINDI -> "टॉर्च की स्थिति अपडेट कर दी गई है, सर।"
                 LanguageStyle.HINGLISH -> "Flashlight illumination toggled, Sir. Visual clarity restored."
-                LanguageStyle.BANGLISH, LanguageStyle.BENGALI -> "Flashlight state change kora hoyechhe Sir."
-                LanguageStyle.HINDI -> "टॉर्च की स्थिति अपडेट कर दी गई है सर।"
                 else -> "Flashlight illumination toggled successfully, sir."
             }
             "wifi" -> when (languageStyle) {
+                LanguageStyle.BENGALI -> "ওয়াই-ফাই সংযোগের স্থিতি আপডেট করা হয়েছে, স্যার।"
+                LanguageStyle.BANGLISH -> "Wi-Fi link update kora hoyechhe, Sir."
+                LanguageStyle.HINDI -> "वाई-फाई कनेक्शन की स्थिति अपडेट कर दी गई है, सर।"
                 LanguageStyle.HINGLISH -> "Wi-Fi link matrix verified and updated, Sir."
                 else -> "Wi-Fi link state calibrated successfully, sir."
             }
             "volume" -> when (languageStyle) {
+                LanguageStyle.BENGALI -> "ভলিউমের স্তর নির্দিষ্ট মাত্রায় সেট করা হয়েছে, স্যার।"
+                LanguageStyle.BANGLISH -> "Sound volume adjust kora hoyechhe, Sir."
+                LanguageStyle.HINDI -> "ऑडियो वॉल्यूम को निर्धारित स्तर पर सेट कर दिया गया है, सर।"
                 LanguageStyle.HINGLISH -> "Audio amplitude calibrated to optimal level, Sir."
                 else -> "Acoustic volume calibrated to requested level, sir."
             }
             "whatsapp" -> when (languageStyle) {
+                LanguageStyle.BENGALI -> "হোয়াটসঅ্যাপ বার্তা সফলভাবে প্রেরণ করা হয়েছে, স্যার।"
+                LanguageStyle.BANGLISH -> "WhatsApp message pathano hoyechhe, Sir."
+                LanguageStyle.HINDI -> "व्हाट्सएप संदेश सफलतापूर्वक भेज दिया गया है, सर।"
                 LanguageStyle.HINGLISH -> "WhatsApp transmission queued and dispatched, Sir."
                 else -> "WhatsApp transmission dispatched with zero packet drop, sir."
             }
             "sms" -> when (languageStyle) {
+                LanguageStyle.BENGALI -> "এসএমএস বার্তা সফলভাবে পাঠানো হয়েছে, স্যার।"
+                LanguageStyle.BANGLISH -> "SMS pathano hoyechhe, Sir."
+                LanguageStyle.HINDI -> "एसएमएस संदेश सफलतापूर्वक भेज दिया गया है, सर।"
                 LanguageStyle.HINGLISH -> "SMS channel transmission sent, Sir."
                 else -> "SMS packet delivered through cellular carrier, sir."
             }
             "calendar" -> when (languageStyle) {
+                LanguageStyle.BENGALI -> "ক্যালেন্ডার ইভেন্টটি আপনার শিডিউলে সংরক্ষিত হয়েছে, স্যার।"
+                LanguageStyle.BANGLISH -> "Calendar event schedule kora hoyechhe, Sir."
+                LanguageStyle.HINDI -> "कैलेंडर इवेंट को आपके शेड्यूल में जोड़ दिया गया है, सर।"
                 LanguageStyle.HINGLISH -> "Calendar entry locked into your schedule, Sir."
                 else -> "Calendar entry locked into your schedule, sir."
             }

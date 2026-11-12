@@ -50,6 +50,8 @@ import com.example.jarvis.ui.theme.JarvisCyanBright
 import com.example.jarvis.ui.theme.JarvisElectricBlue
 import com.example.jarvis.ui.theme.JarvisTextDim
 import com.example.jarvis.ui.theme.JarvisTextSecondary
+import com.example.jarvis.ui.theme.ThemeManager
+import androidx.compose.runtime.collectAsState
 
 enum class NavTab(val label: String, val icon: ImageVector) {
     HOME("HOME", Icons.Default.Adjust),
@@ -68,6 +70,8 @@ fun BottomNav(
     currentTab: NavTab,
     onTabSelected: (NavTab) -> Unit
 ) {
+    val activeTheme by ThemeManager.currentTheme.collectAsState()
+
     // Floating futuristic holographic dock with navigation insets
     Box(
         modifier = Modifier
@@ -76,7 +80,7 @@ fun BottomNav(
             .padding(horizontal = 14.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Translucent floating holographic pill bar with subtle neon border
+        // Translucent floating holographic pill bar with dynamic theme border
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -85,8 +89,8 @@ fun BottomNav(
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            Color(0xF0050B16),
-                            Color(0xFA02050B)
+                            activeTheme.surfaceColor.copy(alpha = 0.94f),
+                            activeTheme.surfaceElevated.copy(alpha = 0.98f)
                         )
                     )
                 )
@@ -94,9 +98,9 @@ fun BottomNav(
                     width = 1.dp,
                     brush = Brush.horizontalGradient(
                         colors = listOf(
-                            JarvisCyan.copy(alpha = 0.45f),
-                            JarvisElectricBlue.copy(alpha = 0.20f),
-                            JarvisCyan.copy(alpha = 0.45f)
+                            activeTheme.primaryColor.copy(alpha = 0.5f),
+                            activeTheme.accentColor.copy(alpha = 0.25f),
+                            activeTheme.primaryColor.copy(alpha = 0.5f)
                         )
                     ),
                     shape = RoundedCornerShape(34.dp)
@@ -128,13 +132,13 @@ fun BottomNav(
                     )
 
                     val iconTint by animateColorAsState(
-                        targetValue = if (isSelected) JarvisCyanBright else JarvisTextDim,
+                        targetValue = if (isSelected) activeTheme.accentColor else JarvisTextDim,
                         animationSpec = tween(durationMillis = 200),
                         label = "dock_icon_tint"
                     )
 
                     val textTint by animateColorAsState(
-                        targetValue = if (isSelected) JarvisCyan else JarvisTextSecondary.copy(alpha = 0.6f),
+                        targetValue = if (isSelected) activeTheme.primaryColor else JarvisTextSecondary.copy(alpha = 0.6f),
                         animationSpec = tween(durationMillis = 200),
                         label = "dock_text_tint"
                     )

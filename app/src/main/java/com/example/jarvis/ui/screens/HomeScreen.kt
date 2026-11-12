@@ -101,6 +101,9 @@ import com.example.jarvis.ui.theme.JarvisTextDim
 import com.example.jarvis.ui.theme.JarvisTextPrimary
 import com.example.jarvis.ui.theme.JarvisTextSecondary
 import com.example.jarvis.ui.theme.ThemeManager
+import com.example.jarvis.ui.theme.MarkArmorTheme
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.lazy.items
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -176,10 +179,13 @@ fun HomeScreen(
         label = "title_glow_pulse"
     )
 
+    val context = LocalContext.current
+    val activeTheme by ThemeManager.currentTheme.collectAsState()
+
     val currentGlowColor by animateColorAsState(
         targetValue = when (jarvisState) {
-            JarvisState.IDLE -> JarvisCyanBright
-            JarvisState.LISTENING -> JarvisCyan
+            JarvisState.IDLE -> activeTheme.accentColor
+            JarvisState.LISTENING -> activeTheme.primaryColor
             JarvisState.THINKING -> JarvisAmber
             JarvisState.SPEAKING -> JarvisGreen
             JarvisState.ERROR -> JarvisRed
@@ -191,7 +197,14 @@ fun HomeScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(JarvisBackground)
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        activeTheme.surfaceColor,
+                        JarvisBackground
+                    )
+                )
+            )
             .testTag("home_screen")
     ) {
         // 1. Background 3D Holographic Particle Grid & Ambient Projection Light
@@ -623,6 +636,62 @@ fun HomeScreen(
                                 color = JarvisElectricBlue,
                                 onClick = { onQuickCommand("JARVIS, diagnostic scan") }
                             )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Text(
+                        text = "HOLOGRAPHIC COLOR MATRIX // ACTIVE: ${activeTheme.title}",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 1.2.sp,
+                        color = activeTheme.primaryColor
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(MarkArmorTheme.entries.toTypedArray()) { theme ->
+                            val isSelected = theme == activeTheme
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(
+                                        if (isSelected) theme.primaryColor.copy(alpha = 0.25f)
+                                        else theme.surfaceColor
+                                    )
+                                    .border(
+                                        width = if (isSelected) 1.5.dp else 0.8.dp,
+                                        color = if (isSelected) theme.accentColor else theme.borderColor,
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .clickable { ThemeManager.setTheme(theme, context) }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(10.dp)
+                                            .clip(CircleShape)
+                                            .background(theme.primaryColor)
+                                    )
+                                    Text(
+                                        text = theme.title.split(" ").first(),
+                                        fontSize = 11.sp,
+                                        fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
+                                        fontFamily = FontFamily.Monospace,
+                                        color = if (isSelected) theme.accentColor else JarvisTextSecondary
+                                    )
+                                }
+                            }
                         }
                     }
                 }
